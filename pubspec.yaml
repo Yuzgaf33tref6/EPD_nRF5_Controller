@@ -1,0 +1,35 @@
+name: epd_controller
+description: 墨水屏日历控制App
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_blue_plus: ^2.1.0
+  image_picker: ^1.0.4
+  # file_picker 暂时注释掉，因为它有平台配置问题
+  # file_picker: ^6.1.1
+  path_provider: ^2.1.1
+  provider: ^6.0.5
+  shared_preferences: ^2.2.2
+  permission_handler: ^12.0.1  # 更新到最新版本
+  intl: ^0.20.2  # 更新到最新版本
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0  # 更新到最新版本
+
+flutter:
+  uses-material-design: true
+  
+  # 可以暂时注释掉资源，等实际有资源时再添加
+  # assets:
+  #   - assets/images/
+  # fonts:
+  #   - family: CustomIcons
+  #     fonts:
+  #       - asset: assets/fonts/custom_icons.ttf
