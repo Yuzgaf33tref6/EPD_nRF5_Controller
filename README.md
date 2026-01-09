@@ -1,5 +1,6 @@
 # EPD_nRF5_Controller
 这是一个用于便捷控制EPD-nRF5墨水屏的上位机程序，基于Flutter编写
+---
 [![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](LICENSE)
 ![Flutter](https://img.shields.io/badge/Flutter-02569B.svg?logo=flutter&logoColor=white)
 ![EPD-nRF5](https://img.shields.io/badge/EPD_nRF5-support-green)
