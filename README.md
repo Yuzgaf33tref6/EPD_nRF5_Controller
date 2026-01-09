@@ -1,0 +1,2 @@
+# EPD_nRF5_Controller
+这是一个用于便捷控制EPD-nRF5墨水屏的上位机程序，基于Flutter编写
