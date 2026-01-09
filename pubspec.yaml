@@ -1,0 +1,19 @@
+name: epd_controller
+description: EPD controller - Flutter port skeleton
+publish_to: 'none'
+version: 0.0.1
+environment:
+  sdk: ">=2.18.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  image: ^4.0.21
+  file_picker: ^5.2.6
+  flutter_reactive_ble: ^5.4.0
+  permission_handler: ^10.4.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
