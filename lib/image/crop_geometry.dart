@@ -107,7 +107,8 @@ RgbaImage rotateImage90Clockwise(RgbaImage image) {
       final int srcX = dy;
       final int srcY = srcHeight - 1 - dx;
       final int srcIndex = (srcY * srcWidth + srcX) * 4;
-      final int dstIndex = (dx * srcWidth + dy) * 4;
+      // 目标图宽 = 原图高，所以行主序下标用 srcHeight 做行宽。
+      final int dstIndex = (dy * srcHeight + dx) * 4;
       dst[dstIndex] = src[srcIndex];
       dst[dstIndex + 1] = src[srcIndex + 1];
       dst[dstIndex + 2] = src[srcIndex + 2];
