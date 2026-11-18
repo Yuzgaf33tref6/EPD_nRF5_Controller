@@ -22,7 +22,7 @@ class RgbaImagePreview extends StatelessWidget {
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: CustomPaint(
-          painter: _RgbaImagePainter(image),
+          painter: RgbaImagePainter(image),
           child: const SizedBox.expand(),
         ),
       ),
@@ -30,10 +30,15 @@ class RgbaImagePreview extends StatelessWidget {
   }
 }
 
-class _RgbaImagePainter extends CustomPainter {
-  _RgbaImagePainter(this.image);
+/// 位图画笔。公开出来给画布编辑页复用。
+///
+/// [version] 用于"图对象没换但内容被就地改了"的场景（手绘时必须逐笔重绘）；默认 0
+/// 表示按对象身份判断，抖动用它足够。
+class RgbaImagePainter extends CustomPainter {
+  RgbaImagePainter(this.image, {this.version = 0});
 
   final RgbaImage image;
+  final int version;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -75,7 +80,8 @@ class _RgbaImagePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RgbaImagePainter oldDelegate) {
-    return !identical(oldDelegate.image, image);
+  bool shouldRepaint(covariant RgbaImagePainter oldDelegate) {
+    return oldDelegate.version != version ||
+        !identical(oldDelegate.image, image);
   }
 }

@@ -43,6 +43,24 @@ void _spread(Uint8List temp, int index, double deltaR, double deltaG, double del
   temp[index + 2] = _toUint8Clamp(temp[index + 2] + deltaB);
 }
 
+/// 各模式调色板的 Lab 值缓存。
+///
+/// 调色板颜色是常量，Lab 转换结果也恒定；`findClosestColor` 每处理一个像素都要
+/// 跟整张调色板比一次，把调色板的 Lab 预先算好能把每像素的 `rgbToLab` 次数从
+/// 「1 + 调色板大小」降到 1 —— 在 400×300 的图上就是 72 万次浮点幂运算的差别，
+/// 直接决定了画布页会不会卡。数值结果与现算完全一致。
+final Map<EpdColorMode, List<LabColor>> _paletteLabCache =
+    <EpdColorMode, List<LabColor>>{};
+
+List<LabColor> _paletteLab(EpdColorMode mode) {
+  return _paletteLabCache.putIfAbsent(mode, () {
+    return <LabColor>[
+      for (final EpdColor color in mode.palette)
+        rgbToLab(color.r, color.g, color.b),
+    ];
+  });
+}
+
 /// 在指定调色板里找 Lab 空间距离最近的颜色。
 ///
 /// [r] [g] [b] 允许是小数：Bayer 抖动会把阈值加到原始颜色上再量化，
@@ -61,15 +79,15 @@ EpdColor findClosestColor(num r, num g, num b, EpdColorMode mode) {
   }
 
   final LabColor inputLab = rgbToLab(r, g, b);
+  final List<LabColor> paletteLab = _paletteLab(mode);
   double minDistance = double.infinity;
   EpdColor closest = palette.first;
 
-  for (final EpdColor color in palette) {
-    final double distance =
-        labDistance(inputLab, rgbToLab(color.r, color.g, color.b));
+  for (int i = 0; i < palette.length; i++) {
+    final double distance = labDistance(inputLab, paletteLab[i]);
     if (distance < minDistance) {
       minDistance = distance;
-      closest = color;
+      closest = palette[i];
     }
   }
 

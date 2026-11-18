@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 
 import '../devices/canvas_size.dart';
 import '../devices/epd_driver.dart';
+import '../image/canvas_editing.dart';
 import '../image/crop_geometry.dart';
 import '../image/dither.dart';
 import '../image/epd_color.dart';
@@ -118,6 +119,8 @@ class AppState extends ChangeNotifier {
 
   RgbaImage? _previewCache;
   Object? _previewCacheKey;
+  ImageTransferPlan? _planCache;
+  Object? _planCacheKey;
 
   // ---- 外观与日志 ----
   ThemeMode _themeMode = ThemeMode.system;
@@ -198,15 +201,31 @@ class AppState extends ChangeNotifier {
   }
 
   /// 当前参数下应发送的完整写指令序列（真算出来的）。
-  ImageTransferPlan get transferPlan => planImageTransfer(
-        image: previewImage,
-        driver: _driver,
-        colorMode: colorMode,
-        canvasSizeName: canvasSize.name,
-        mtu: _mtu,
-        rleSupported: _rleSupported,
-        interleavedCount: _interleavedCount,
-      );
+  ///
+  /// 这条计算要跑位打包 + RLE 压缩，400×300 的图在千毫秒量级；而画布页一次
+  /// build 会读好几次（统计行、警告列表、发送按钮），所以必须缓存 —— 否则单单
+  /// 一次重绘就把主线程堵死，这正是之前"进页面就卡、拖滑块更卡"的根因。
+  ImageTransferPlan get transferPlan {
+    final RgbaImage image = previewImage;
+    final Object key = Object.hash(image, _driver.id, canvasSize.name, colorMode,
+        _mtu, _rleSupported, _interleavedCount);
+    final ImageTransferPlan? cached = _planCache;
+    if (cached != null && _planCacheKey == key) {
+      return cached;
+    }
+    final ImageTransferPlan plan = planImageTransfer(
+      image: image,
+      driver: _driver,
+      colorMode: colorMode,
+      canvasSizeName: canvasSize.name,
+      mtu: _mtu,
+      rleSupported: _rleSupported,
+      interleavedCount: _interleavedCount,
+    );
+    _planCache = plan;
+    _planCacheKey = key;
+    return plan;
+  }
 
   /// 传图统计，一行文字。
   String get transferSummary {
@@ -596,6 +615,60 @@ class AppState extends ChangeNotifier {
   void _invalidatePreview() {
     _previewCache = null;
     _previewCacheKey = null;
+    _planCache = null;
+    _planCacheKey = null;
+  }
+
+  // ============ 画布编辑 ============
+
+  final ImageHistory _history = ImageHistory();
+
+  bool get canUndo => _history.canUndo;
+
+  bool get canRedo => _history.canRedo;
+
+  /// 进入编辑会话：把当前底图作为撤销历史的起点。
+  void beginEditing() {
+    _history.reset(_sourceImage);
+    notifyListeners();
+  }
+
+  /// 提交一次编辑结果（一笔、一段文字、一次填充）。
+  void commitEdit(RgbaImage image) {
+    _sourceImage = image;
+    _history.push(image);
+    _invalidatePreview();
+    notifyListeners();
+  }
+
+  /// 撤销一步。
+  void undoEdit() {
+    final RgbaImage? image = _history.undo();
+    if (image == null) {
+      return;
+    }
+    _sourceImage = image;
+    _invalidatePreview();
+    notifyListeners();
+  }
+
+  /// 重做一步。
+  void redoEdit() {
+    final RgbaImage? image = _history.redo();
+    if (image == null) {
+      return;
+    }
+    _sourceImage = image;
+    _invalidatePreview();
+    notifyListeners();
+  }
+
+  /// 直接换掉底图（导入图片用），并把历史重置到这张图。
+  void replaceSource(RgbaImage image) {
+    _sourceImage = image;
+    _history.reset(image);
+    _invalidatePreview();
+    notifyListeners();
   }
 
   // ============ 外观与日志 ============

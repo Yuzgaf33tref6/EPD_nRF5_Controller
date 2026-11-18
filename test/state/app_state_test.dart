@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:epd_controller/devices/epd_driver.dart';
+import 'package:epd_controller/image/canvas_editing.dart';
 import 'package:epd_controller/image/dither.dart';
+import 'package:epd_controller/image/rgba_image.dart';
 import 'package:epd_controller/protocol/epd_protocol.dart';
 import 'package:epd_controller/protocol/transfer.dart';
 import 'package:epd_controller/services/ble_service.dart';
@@ -217,6 +219,51 @@ void main() {
           List<int>.of(state.previewImage.data, growable: false);
       expect(state.algorithm, DitherAlgorithm.bayer);
       expect(bayer, isNot(equals(floyd)));
+    });
+  });
+
+  group('画布编辑', () {
+    test('提交笔画后预览随之变化，撤销能还原', () {
+      final AppState state = buildState();
+      final List<int> before =
+          List<int>.of(state.previewImage.data, growable: false);
+
+      state.beginEditing();
+      expect(state.canUndo, isFalse);
+
+      final RgbaImage edited = state.sourceImage.clone();
+      drawDot(edited, x: 200, y: 150, radius: 20);
+      state.commitEdit(edited);
+      expect(state.canUndo, isTrue);
+
+      final List<int> after =
+          List<int>.of(state.previewImage.data, growable: false);
+      expect(after, isNot(equals(before)));
+
+      state.undoEdit();
+      final List<int> restored =
+          List<int>.of(state.previewImage.data, growable: false);
+      expect(restored, equals(before));
+      expect(state.canRedo, isTrue);
+
+      state.redoEdit();
+      expect(
+        List<int>.of(state.previewImage.data, growable: false),
+        equals(after),
+      );
+    });
+
+    test('换底图会重置历史', () {
+      final AppState state = buildState();
+      state.beginEditing();
+      final RgbaImage edited = state.sourceImage.clone();
+      drawDot(edited, x: 10, y: 10, radius: 3);
+      state.commitEdit(edited);
+      expect(state.canUndo, isTrue);
+
+      state.replaceSource(edited.clone());
+      expect(state.canUndo, isFalse);
+      expect(state.canRedo, isFalse);
     });
   });
 

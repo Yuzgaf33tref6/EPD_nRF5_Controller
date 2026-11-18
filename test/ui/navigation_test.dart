@@ -83,6 +83,23 @@ void main() {
     expect(find.text('EPD Controller'), findsOneWidget);
   });
 
+  testWidgets('画布页 → 画布编辑 → 返回', (WidgetTester tester) async {
+    await tester.pumpWidget(const EpdControllerApp());
+
+    await tester.tap(find.text('编辑并发送'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('画布编辑'));
+    await tester.pumpAndSettle();
+    expect(find.text('画布编辑'), findsOneWidget);
+    expect(find.text('工具'), findsOneWidget);
+    expect(find.text('画笔'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('画布与传图'), findsOneWidget);
+  });
+
   testWidgets('未连接时设备控制按钮禁用', (WidgetTester tester) async {
     await tester.pumpWidget(const EpdControllerApp());
 
