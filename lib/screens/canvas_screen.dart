@@ -212,11 +212,6 @@ class _CanvasScreenState extends State<CanvasScreen> {
                         runSpacing: 8,
                         children: <Widget>[
                           OutlinedButton.icon(
-                            onPressed: state.rotateSource,
-                            icon: const Icon(Icons.rotate_90_degrees_cw),
-                            label: const Text('旋转 90°'),
-                          ),
-                          OutlinedButton.icon(
                             onPressed: () => _importImage(state),
                             icon: const Icon(Icons.add_photo_alternate_outlined),
                             label: const Text('导入图片'),

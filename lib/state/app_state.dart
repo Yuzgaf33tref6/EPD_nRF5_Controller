@@ -924,7 +924,7 @@ class AppState extends ChangeNotifier {
     );
     addLog(
       LogLevel.info,
-      '刷新命令已发送。三色屏整屏刷新通常需要 2~10 秒，'
+      '刷新命令已发送。墨水屏整屏刷新通常需要 2~10 秒，'
       '期间屏幕闪烁/变灰是正常的，别急着断电。',
     );
     notifyListeners();

@@ -1,0 +1,170 @@
+name: Release
+
+# 打 tag（v0.1.0 这种）时构建「全 ABI、仅 release」的安装包并发布到 GitHub Release。
+# 日常开发用 ci.yml（debug + arm64，跑得快）；这里只服务于正式发版。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build release APKs (all ABIs) and publish
+    # 与 ci.yml 保持一致：固定镜像，不跟随 ubuntu-latest 漂移。
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 与 ci.yml 一致：钉死 3.44.9（Material 拆包之前的最后一条 stable 线）。
+      - name: Set up Flutter 3.44.9
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          set -x
+          flutter --version
+          dart --version
+          java -version
+
+      # 固定 keystore：每个版本签名一致，可以直接覆盖安装升级。
+      - name: Prepare release signing (from secrets)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::缺少 ANDROID_KEYSTORE_BASE64，正式发布必须使用固定签名，已中止"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/epd-release.p12
+          cat > android/key.properties <<EOF
+          storeFile=app/epd-release.p12
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          EOF
+          echo "release 签名配置就绪：$(grep -c . android/key.properties) 行"
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      # 正式发版覆盖全部 ABI（arm64 为主，armeabi-v7a 兼容老机，x86_64 给模拟器）。
+      # 注意：--split-per-abi 会为每个 ABI 单独出一个包，体积小、安装快。
+      - name: Build release APKs (all ABIs)
+        run: |
+          flutter build apk \
+            --release \
+            --split-per-abi \
+            --target-platform android-arm,android-arm64,android-x64
+
+      - name: Collect artifacts and hashes
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-*-release.apk dist/
+          cd dist
+          sha256sum ./*.apk > SHA256SUMS.txt
+          echo '---- files ----'
+          ls -lh
+          echo '---- hashes ----'
+          cat SHA256SUMS.txt
+
+      - name: Compose release notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "EPD Controller v${VERSION}"
+            echo
+            echo "EPD-nRF5 墨水屏的 Android 客户端，把原 Web 上位机的功能搬到手机上："
+            echo "蓝牙扫描/连接、时间同步、清屏刷新、图片导入与裁剪、手绘画布（画笔/橡皮/文字/撤销）、"
+            echo "6 种抖动算法、三色/四色/六色色彩模式，以及传图速度分档与设置持久化。"
+            echo
+            echo "协议层、抖动算法、位打包、传图编排全部与 Web 版逐字节对拍（golden 测试），"
+            echo "固件侧无需改动，支持 17 种驱动与 26 种画布尺寸。"
+            echo
+            echo "## 安装"
+            echo
+            echo "1. 下载下面与你手机架构对应的 apk（绝大多数手机选 \`arm64-v8a\`）；"
+            echo "2. 首次安装需要允许「安装未知来源应用」；"
+            echo "3. 从旧版本升级可以直接覆盖安装（签名固定）；首次从更早的临时构建升级需先卸载。"
+            echo "4. 打开后先到「蓝牙诊断」确认蓝牙与权限，再到「搜索并连接」扫描设备。"
+            echo
+            echo "## 文件清单"
+            echo
+            echo '| 文件 | 大小 | ABI |'
+            echo '| --- | --- | --- |'
+            for f in dist/*.apk; do
+              name="$(basename "$f")"
+              case "$name" in
+                *arm64-v8a*) abi="arm64-v8a（绝大多数手机）" ;;
+                *armeabi-v7a*) abi="armeabi-v7a（老设备）" ;;
+                *x86_64*) abi="x86_64（模拟器）" ;;
+                *) abi="-" ;;
+              esac
+              size="$(du -h "$f" | cut -f1)"
+              echo "| \`$name\` | $size | $abi |"
+            done
+            echo
+            echo "## 校验值（SHA-256）"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "## 说明"
+            echo
+            echo "- 构建环境：Flutter 3.44.9 / Dart 3.12.2 / AGP 8.11.1 / JDK 17，release 开启 R8 代码压缩与资源裁剪。"
+            echo "- 目标设备：nRF51822/nRF51802 系列 EPD 墨水屏（固件 https://github.com/tsl0922/EPD-nRF5 ）。"
+            echo "- 已知限制：三色屏整屏刷新需要 2~10 秒；不同固件版本的 RLE 支持以设备通知为准。"
+            echo "- 许可证：GPL-3.0（与上游 EPD-nRF5 一致）。"
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Upload artifacts (workflow run)
+        uses: actions/upload-artifact@v7
+        with:
+          name: epd-controller-release-${{ github.ref_name }}
+          path: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: EPD Controller ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

@@ -35,6 +35,9 @@ class _CropScreenState extends State<CropScreen> {
   /// 预览用的小图，避免每帧都拿几百万像素去画。
   static const int _previewMaxEdge = 720;
 
+  /// 当前工作图。导入图片后如果方向不对，可以在这里旋转 90°，再裁剪。
+  late RgbaImage _working = widget.source;
+
   ui.Image? _preview;
   RgbaImage? _previewImage;
   double _zoom = 1;
@@ -59,16 +62,18 @@ class _CropScreenState extends State<CropScreen> {
 
   Future<void> _preparePreview() async {
     try {
-      final RgbaImage preview = _downscaleForPreview(widget.source);
+      final RgbaImage preview = _downscaleForPreview(_working);
       final ui.Image image = await _rgbaToUiImage(preview);
       if (!mounted) {
         image.dispose();
         return;
       }
+      final ui.Image? oldPreview = _preview;
       setState(() {
         _preview = image;
         _previewImage = preview;
       });
+      oldPreview?.dispose();
     } catch (error) {
       if (!mounted) {
         return;
@@ -125,6 +130,25 @@ class _CropScreenState extends State<CropScreen> {
     });
   }
 
+  /// 顺时针旋转 90°。旋转会改变宽高比，所以顺便把缩放和平移复位，
+  /// 让用户从「整张图」重新构图。
+  Future<void> _rotate() async {
+    if (_busy) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _working = rotateImage90Clockwise(_working);
+      _zoom = 1;
+      _panX = 0;
+      _panY = 0;
+    });
+    await _preparePreview();
+    if (mounted) {
+      setState(() => _busy = false);
+    }
+  }
+
   void _handleScaleStart(ScaleStartDetails details) {
     _zoomAtStart = _zoom;
   }
@@ -152,7 +176,7 @@ class _CropScreenState extends State<CropScreen> {
     setState(() => _busy = true);
     try {
       final CropSourceRect rect = cropSourceRect(
-        imageWidth: widget.source.width.toDouble(),
+        imageWidth: _working.width.toDouble(),
         viewWidth: viewSize.width,
         viewHeight: viewSize.height,
         zoom: _zoom,
@@ -160,7 +184,7 @@ class _CropScreenState extends State<CropScreen> {
         panY: _panY,
       );
       final RgbaImage cropped = cropScaled(
-        source: widget.source,
+        source: _working,
         left: rect.left,
         top: rect.top,
         width: rect.width,
@@ -185,6 +209,11 @@ class _CropScreenState extends State<CropScreen> {
       appBar: AppBar(
         title: const Text('裁剪图片'),
         actions: <Widget>[
+          IconButton(
+            tooltip: '旋转 90°',
+            onPressed: _busy ? null : _rotate,
+            icon: const Icon(Icons.rotate_90_degrees_cw),
+          ),
           IconButton(
             tooltip: '重置',
             onPressed: _reset,
@@ -219,7 +248,7 @@ class _CropScreenState extends State<CropScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  '拖动平移，双指或滚轮缩放（0.1~5 倍）。'
+                  '拖动平移，双指或滚轮缩放（0.1~5 倍）；方向不对可以点右上角旋转 90°。'
                   '裁剪结果会缩放到 ${widget.canvasWidth}×${widget.canvasHeight}。',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -277,8 +306,8 @@ class _CropScreenState extends State<CropScreen> {
                 _previewImage!.height.toDouble(),
               ),
               sourceSize: Size(
-                widget.source.width.toDouble(),
-                widget.source.height.toDouble(),
+                _working.width.toDouble(),
+                _working.height.toDouble(),
               ),
               zoom: _zoom,
               panX: _panX,
