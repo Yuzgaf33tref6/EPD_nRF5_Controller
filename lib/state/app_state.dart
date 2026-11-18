@@ -101,6 +101,7 @@ class AppState extends ChangeNotifier {
   int? _firmwareVersion;
   EpdConfig? _config;
   StreamSubscription<Uint8List>? _notificationSubscription;
+  StreamSubscription<bool>? _connectionChangeSubscription;
   bool _sawConfigNotification = false;
   String _adapterStatusText = '未检查';
   int _writesSent = 0;
@@ -114,6 +115,13 @@ class AppState extends ChangeNotifier {
   bool _rleSupported = false;
   bool _interleavedCountOverride = false;
   int _interleavedCount = 50;
+
+  /// 连接后主动请求的 ATT MTU。默认 23 每次只能写 20 字节，一次传图要上千条
+  /// 写指令，在 nRF51 上既慢又会把蓝牙缓冲撑爆（GATT 133 后系统直接拆连接）。
+  static const int _targetMtu = 247;
+
+  /// 是否往 logcat 打印每条写指令（诊断页开关）。
+  bool _verboseTransfers = false;
 
   // ---- 图像与驱动 ----
   EpdDriver _driver = _defaultDriver;
@@ -147,6 +155,26 @@ class AppState extends ChangeNotifier {
   int get mtu => _mtu;
   bool get rleSupported => _rleSupported;
   int get interleavedCount => _interleavedCount;
+
+  /// 传给 `planWriteImage` 的 mtu 参数：它内部按 `mtu - 2` 分块，而 ATT 写请求
+  /// 最多只能带 `ATT_MTU - 3` 字节，所以这里减 1 让最终分块正好是 `_mtu - 3`。
+  int get writeMtu => _mtu > 4 ? _mtu - 1 : 3;
+
+  /// 每块最多写多少字节有效负载（展示用）。
+  int get writeChunkBytes => writeMtu - 2;
+
+  /// 是否把每条写指令打到 logcat。
+  bool get verboseTransfers => _verboseTransfers;
+
+  /// 切换详细传输日志。
+  void setVerboseTransfers(bool value) {
+    if (value == _verboseTransfers) {
+      return;
+    }
+    _verboseTransfers = value;
+    addLog(LogLevel.info, value ? '已开启详细传输日志（logcat 可见每条报文）' : '已关闭详细传输日志');
+    notifyListeners();
+  }
 
   /// 蓝牙子系统状态（诊断页用）。
   String get adapterStatusText => _adapterStatusText;
@@ -223,9 +251,12 @@ class AppState extends ChangeNotifier {
       driver: _driver,
       colorMode: colorMode,
       canvasSizeName: canvasSize.name,
-      mtu: _mtu,
+      mtu: writeMtu,
       rleSupported: _rleSupported,
       interleavedCount: _interleavedCount,
+      // 真机上必须一条一条等确认：连续几十条无响应写会撑爆蓝牙缓冲，
+      // Android 回 GATT 133 并直接拆连接（这就是「命令发不完 + 假连接」的根因）。
+      alwaysWithResponse: true,
     );
     _planCache = plan;
     _planCacheKey = key;
@@ -238,7 +269,8 @@ class AppState extends ChangeNotifier {
     final StringBuffer buffer = StringBuffer()
       ..write('${plan.totalWrites} 条写指令')
       ..write(' / ${plan.processedBytes} 字节')
-      ..write(plan.usedRle ? '（RLE 压缩）' : '（未压缩）');
+      ..write(plan.usedRle ? '（RLE 压缩）' : '（未压缩）')
+      ..write(' / 每块 $writeChunkBytes 字节');
     if (plan.usedUc8159) {
       buffer.write(' / UC8159 合并');
     }
@@ -337,21 +369,75 @@ class AppState extends ChangeNotifier {
 
     _connected = device;
     _sawConfigNotification = false;
+
+    // 先协商 MTU 再传图：默认 ATT MTU 只有 23（每次写 20 字节），400×300 三色
+    // 一次要发上千条，既慢又容易让 nRF51 的蓝牙缓冲溢出。
+    int negotiatedMtu = _mtu;
+    try {
+      negotiatedMtu = await _ble.requestMtu(_targetMtu);
+    } catch (error) {
+      addLog(LogLevel.warning, 'MTU 协商失败：$error（继续用 $_mtu）');
+    }
+    if (negotiatedMtu >= 23) {
+      _mtu = negotiatedMtu > 517 ? 517 : negotiatedMtu;
+    }
+    addLog(
+      LogLevel.info,
+      'MTU 协商结果：$_mtu（每条最多写 $writeChunkBytes 字节有效负载）',
+    );
+
     _firmwareVersion = await _ble.readFirmwareVersion();
     _rleSupported =
         _firmwareVersion != null && _firmwareVersion! >= kMinRleFirmwareVersion;
     _notificationSubscription =
         _ble.notifications.listen(_handleNotification);
 
+    // 监听意外断开：设备被写爆 / 走远 / 面板忙都会让系统静默拆连接，
+    // 不监听的话界面会一直显示「已连接」，实际已经发不出去了。
+    await _connectionChangeSubscription?.cancel();
+    _connectionChangeSubscription = _ble.connectionChanges.listen(
+      (bool stillConnected) {
+        if (stillConnected) {
+          return;
+        }
+        _handleUnexpectedDisconnect();
+      },
+    );
+
     addLog(LogLevel.success, '已连接 ${device.name}，固件版本 $firmwareVersionText');
     addLog(
       LogLevel.info,
       '已订阅命令特征通知，自动发送 INIT 命令 …',
     );
-    await _writeSilently(<EpdWrite>[
-      EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
-    ]);
+    try {
+      await _writeSilently(<EpdWrite>[
+        EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
+      ]);
+    } catch (error) {
+      addLog(LogLevel.error, '发送 INIT 失败：$error');
+    }
     _isConnecting = false;
+    notifyListeners();
+  }
+
+  /// 意外断开（不是用户点「断开」）：清掉连接态并给出可执行的提示。
+  void _handleUnexpectedDisconnect() {
+    if (_connected == null) {
+      return;
+    }
+    final String name = _connected!.name;
+    _connected = null;
+    _firmwareVersion = null;
+    _config = null;
+    _rleSupported = false;
+    _sawConfigNotification = false;
+    _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+    addLog(
+      LogLevel.error,
+      '与 $name 的连接已断开（设备主动断开或蓝牙链路中断）。'
+      '写入过快、距离过远、屏幕正在刷新都可能触发，请重新连接。',
+    );
     notifyListeners();
   }
 
@@ -362,6 +448,8 @@ class AppState extends ChangeNotifier {
     }
     await _notificationSubscription?.cancel();
     _notificationSubscription = null;
+    await _connectionChangeSubscription?.cancel();
+    _connectionChangeSubscription = null;
     await _ble.disconnect();
     _connected = null;
     _firmwareVersion = null;
@@ -404,8 +492,13 @@ class AppState extends ChangeNotifier {
     final EpdTextNotification text = parseTextNotification(value);
     _recordNotification('文本通知：${text.text}');
     if (text.mtu != null) {
-      setMtu(text.mtu!);
-      addLog(LogLevel.info, '固件报告 MTU = ${text.mtu}');
+      // 固件把软设备里的 MTU 报回来。我们已经主动协商过一次，只接受「更大」的
+      // 值：否则一条过时的 mtu=20 会把协商好的 247 打回原形，又开始上千条写。
+      final int reported = text.mtu!;
+      addLog(LogLevel.info, '固件报告 MTU = $reported');
+      if (reported > _mtu) {
+        setMtu(reported);
+      }
     }
     if (text.rleSupported && !_rleSupported) {
       _rleSupported = true;
@@ -456,9 +549,15 @@ class AppState extends ChangeNotifier {
     if (!_requireConnected('发送诊断命令')) {
       return;
     }
-    await _writeSilently(<EpdWrite>[
-      EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
-    ]);
+    try {
+      await _writeSilently(<EpdWrite>[
+        EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
+      ]);
+    } catch (error) {
+      addLog(LogLevel.error, 'INIT 发送失败：$error');
+      notifyListeners();
+      return;
+    }
     addLog(LogLevel.success, '已发送 INIT（累计写入 $_writesSent 条）');
     notifyListeners();
   }
@@ -475,7 +574,13 @@ class AppState extends ChangeNotifier {
       utcOffsetHours: now.timeZoneOffset.inHours,
       mode: clockMode ? EpdTimeMode.clock : EpdTimeMode.calendar,
     );
-    await _writeSilently(writes);
+    try {
+      await _writeSilently(writes);
+    } catch (error) {
+      addLog(LogLevel.error, '时间下发失败：$error');
+      notifyListeners();
+      return;
+    }
     addLog(
       LogLevel.success,
       '${clockMode ? '时钟' : '日历'}模式时间已下发：${_hex(writes.first.payload)}',
@@ -496,7 +601,13 @@ class AppState extends ChangeNotifier {
     if (!_requireConnected(label)) {
       return;
     }
-    await _writeSilently(writes);
+    try {
+      await _writeSilently(writes);
+    } catch (error) {
+      addLog(LogLevel.error, '$label失败：$error');
+      notifyListeners();
+      return;
+    }
     addLog(LogLevel.success, '$label：${_hex(writes.first.payload)}');
     notifyListeners();
   }
@@ -507,21 +618,38 @@ class AppState extends ChangeNotifier {
       return;
     }
     final ImageTransferPlan plan = transferPlan;
-    addLog(LogLevel.info, '开始发送：${plan.totalWrites} 条写指令，'
-        '${plan.processedBytes} 字节');
+    addLog(
+      LogLevel.info,
+      '开始发送：${plan.totalWrites} 条写指令 / ${plan.processedBytes} 字节 / '
+      'MTU $_mtu（每块 $writeChunkBytes 字节）',
+    );
     notifyListeners();
 
     int sent = 0;
+    final int total = plan.totalWrites;
+    final int progressStep = total > 40 ? total ~/ 10 : 0;
     try {
       for (final EpdWrite write in plan.writes) {
-        await _ble.write(write.payload, withResponse: write.withResponse);
+        await _writeWithRetry(write);
         sent++;
         _writesSent++;
+        if (_verboseTransfers) {
+          debugPrint(
+            '[EPD] #$sent/$total cmd=0x${write.payload.first.toRadixString(16).padLeft(2, '0')} '
+            'len=${write.payload.length} reply=${write.withResponse} '
+            'bytes=${_hex(write.payload)}',
+          );
+        }
+        if (progressStep > 0 && sent % progressStep == 0 && sent < total) {
+          addLog(LogLevel.info, '发送中 $sent/$total');
+          notifyListeners();
+        }
       }
     } catch (error) {
       addLog(
         LogLevel.error,
-        '发送中断（已发 $sent/${plan.totalWrites} 条）：$error',
+        '发送中断（已发 $sent/$total 条）：$error '
+        '${_connected == null ? '连接已断开，请重新连接。' : '可以重试一次；仍失败请缩短距离或降低 MTU。'}',
       );
       notifyListeners();
       return;
@@ -532,13 +660,38 @@ class AppState extends ChangeNotifier {
       '发送完成：${plan.imageWrites} 条图像写指令'
       '${plan.usedRle ? '，已启用 RLE' : ''}',
     );
+    addLog(
+      LogLevel.info,
+      '刷新命令已发送。三色屏整屏刷新通常需要 2~10 秒，'
+      '期间屏幕闪烁/变灰是正常的，别急着断电。',
+    );
     notifyListeners();
+  }
+
+  /// 写一条负载，失败自动重试。
+  ///
+  /// Android 上 GATT 133 常常是瞬时的（蓝牙缓冲瞬间满），重试一次往往就过去了；
+  /// 连续三次仍失败说明链路真的不行，交给上层报错。
+  Future<void> _writeWithRetry(EpdWrite write, {int attempts = 3}) async {
+    Object? lastError;
+    for (int attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await _ble.write(write.payload, withResponse: write.withResponse);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) {
+          await Future<void>.delayed(Duration(milliseconds: 60 * attempt));
+        }
+      }
+    }
+    throw StateError('写入失败（已重试 $attempts 次）：$lastError');
   }
 
   /// 逐条写，不逐条打日志（避免一次传图刷几百条日志）。
   Future<void> _writeSilently(List<EpdWrite> writes) async {
     for (final EpdWrite write in writes) {
-      await _ble.write(write.payload, withResponse: write.withResponse);
+      await _writeWithRetry(write);
       _writesSent++;
     }
   }

@@ -80,6 +80,9 @@ abstract class EpdBleService {
   /// 命令特征的通知流（连接后可用）。
   Stream<Uint8List> get notifications;
 
+  /// 连接状态变化：true = 已连接，false = 已断开（含意外断开）。
+  Stream<bool> get connectionChanges;
+
   /// 是否已连接。
   bool get isConnected;
 
@@ -103,6 +106,12 @@ class ReactiveBleService implements EpdBleService {
 
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
+
+  final StreamController<bool> _connectionChanges =
+      StreamController<bool>.broadcast();
+
+  @override
+  Stream<bool> get connectionChanges => _connectionChanges.stream;
 
   StreamSubscription<ConnectionStateUpdate>? _connectionSubscription;
   StreamSubscription<List<int>>? _notificationSubscription;
@@ -250,11 +259,16 @@ class ReactiveBleService implements EpdBleService {
       (ConnectionStateUpdate update) {
         if (update.connectionState == DeviceConnectionState.connected) {
           _isConnected = true;
+          _connectionChanges.add(true);
           if (!completer.isCompleted) {
             completer.complete();
           }
         } else if (update.connectionState == DeviceConnectionState.disconnected) {
+          final bool wasConnected = _isConnected;
           _isConnected = false;
+          if (wasConnected) {
+            _connectionChanges.add(false);
+          }
           if (!completer.isCompleted) {
             completer.completeError(
               StateError('设备在连接过程中断开：${update.deviceId}'),
@@ -295,12 +309,16 @@ class ReactiveBleService implements EpdBleService {
 
   @override
   Future<void> disconnect() async {
+    final bool wasConnected = _isConnected;
     await _notificationSubscription?.cancel();
     _notificationSubscription = null;
     await _connectionSubscription?.cancel();
     _connectionSubscription = null;
     _isConnected = false;
     _deviceId = null;
+    if (wasConnected) {
+      _connectionChanges.add(false);
+    }
   }
 
   @override

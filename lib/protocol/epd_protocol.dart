@@ -152,6 +152,7 @@ WriteImagePlan planWriteImage({
   required ImagePlane plane,
   required bool rleSupported,
   int interleavedCount = 50,
+  bool alwaysWithResponse = false,
 }) {
   if (mtu < 3) {
     // mtu - 2 < 1 会让分块数为 Infinity，web 版在这种情况下会死循环。
@@ -198,6 +199,23 @@ WriteImagePlan planWriteImage({
         withResponse: false,
       ));
     }
+  }
+
+  if (alwaysWithResponse) {
+    // 一条一条等设备确认。实测 nRF51 上连续几十条无响应写会撑爆蓝牙缓冲，
+    // Android 直接回 GATT 133 并拆掉连接，所以真机上必须能切成「全带响应」。
+    return WriteImagePlan(
+      chunkSize: chunkSize,
+      useRle: useRle,
+      chunks: <WriteImageChunk>[
+        for (final WriteImageChunk chunk in chunks)
+          WriteImageChunk(
+            flag: chunk.flag,
+            data: chunk.data,
+            withResponse: true,
+          ),
+      ],
+    );
   }
 
   // 应答节奏单独走一遍，保证与 web 版逐块一致。

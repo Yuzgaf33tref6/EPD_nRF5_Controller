@@ -130,6 +130,7 @@ ImageTransferPlan planImageTransfer({
   required int mtu,
   required bool rleSupported,
   int interleavedCount = 50,
+  bool alwaysWithResponse = false,
 }) {
   final warnings = <TransferWarning>[
     if (canvasSizeName != driver.canvasSizeName) TransferWarning.canvasSizeMismatch,
@@ -152,6 +153,7 @@ ImageTransferPlan planImageTransfer({
       plane: plane,
       rleSupported: rleSupported,
       interleavedCount: interleavedCount,
+      alwaysWithResponse: alwaysWithResponse,
     );
     usedRle = usedRle || plan.useRle;
     for (final WriteImageChunk chunk in plan.chunks) {

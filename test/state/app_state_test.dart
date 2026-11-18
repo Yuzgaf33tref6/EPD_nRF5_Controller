@@ -103,7 +103,28 @@ void main() {
       expect(state.notificationLog, hasLength(2));
       expect(state.notificationLog.first, contains('配置通知'));
       expect(state.notificationLog.last, contains('mtu=20'));
-      expect(state.mtu, FakeBleService.mtu);
+      // 连接时主动协商到 247；固件那条过时的 mtu=20 不会把协商结果打回去。
+      expect(state.mtu, 247);
+      expect(state.writeChunkBytes, 244);
+    });
+
+    test('意外断开时把连接状态清掉并记错误日志', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+      expect(state.isConnected, isTrue);
+
+      ble.simulateDisconnect();
+      await settle();
+
+      expect(state.isConnected, isFalse);
+      expect(state.connectedDevice, isNull);
+      expect(
+        state.logs.map((LogEntry entry) => entry.level),
+        contains(LogLevel.error),
+      );
     });
 
     test('断开后清空固件与配置', () async {

@@ -45,6 +45,24 @@ class FakeBleService implements EpdBleService {
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
 
+  final StreamController<bool> _connectionChanges =
+      StreamController<bool>.broadcast();
+
+  @override
+  Stream<bool> get connectionChanges => _connectionChanges.stream;
+
+  /// 模拟「设备端突然断开」（比如写入过快导致 GATT 133 后系统拆连接）。
+  ///
+  /// 只用于测试与诊断页的「模拟断开」按钮。
+  void simulateDisconnect() {
+    if (!_isConnected) {
+      return;
+    }
+    _isConnected = false;
+    _deviceId = null;
+    _connectionChanges.add(false);
+  }
+
   /// 收到的所有写入负载，按顺序。
   final List<Uint8List> writtenPayloads = <Uint8List>[];
 
@@ -92,12 +110,17 @@ class FakeBleService implements EpdBleService {
     await Future<void>.delayed(connectDelay);
     _deviceId = deviceId;
     _isConnected = true;
+    _connectionChanges.add(true);
   }
 
   @override
   Future<void> disconnect() async {
+    final bool wasConnected = _isConnected;
     _isConnected = false;
     _deviceId = null;
+    if (wasConnected) {
+      _connectionChanges.add(false);
+    }
   }
 
   @override
@@ -109,7 +132,10 @@ class FakeBleService implements EpdBleService {
   }
 
   @override
-  Future<int> requestMtu(int mtu) async => mtu < FakeBleService.mtu ? mtu : FakeBleService.mtu;
+  Future<int> requestMtu(int mtu) async {
+    // 真机上不一定会给到请求值，这里模拟「给到请求值但限制在合法范围」。
+    return mtu.clamp(23, 517);
+  }
 
   @override
   Future<void> write(Uint8List payload, {bool withResponse = true}) async {
@@ -139,5 +165,6 @@ class FakeBleService implements EpdBleService {
   /// 释放内部 StreamController，测试结束前调用。
   Future<void> dispose() async {
     await _notifications.close();
+    await _connectionChanges.close();
   }
 }

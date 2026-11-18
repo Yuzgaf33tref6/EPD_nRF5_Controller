@@ -38,7 +38,10 @@ class DiagnosticsScreen extends StatelessWidget {
                       ),
                       _InfoRow(label: '固件', value: state.firmwareVersionText),
                       _InfoRow(label: '引脚', value: state.pinsText),
-                      _InfoRow(label: 'MTU', value: '${state.mtu}'),
+                      _InfoRow(
+                        label: 'MTU',
+                        value: '${state.mtu}（每块 ${state.writeChunkBytes} 字节）',
+                      ),
                       _InfoRow(
                         label: 'RLE',
                         value: state.rleSupported ? '支持' : '不支持',
@@ -75,6 +78,18 @@ class DiagnosticsScreen extends StatelessWidget {
                             label: const Text('发送 INIT 测试'),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text('详细传输日志'),
+                        subtitle: const Text(
+                          '开启后每条写指令（序号 / 长度 / 是否等确认 / 原始字节）'
+                          '都会打到 logcat，排查「发不完」「刷新不全」时用',
+                        ),
+                        value: state.verboseTransfers,
+                        onChanged: state.setVerboseTransfers,
                       ),
                       const SizedBox(height: 8),
                       Text(

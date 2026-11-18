@@ -138,5 +138,37 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('alwaysWithResponse 时每一条都等设备确认（真机防 GATT 133）', () {
+      final Uint8List data = Uint8List.fromList(
+        List<int>.generate(200, (int i) => i & 0xff),
+      );
+      final WriteImagePlan webLike = planWriteImage(
+        data: data,
+        mtu: 247,
+        plane: ImagePlane.black,
+        rleSupported: false,
+        interleavedCount: 50,
+      );
+      final WriteImagePlan safe = planWriteImage(
+        data: data,
+        mtu: 247,
+        plane: ImagePlane.black,
+        rleSupported: false,
+        interleavedCount: 50,
+        alwaysWithResponse: true,
+      );
+
+      // 分块与字节完全一样，只有应答节奏不同。
+      expect(safe.chunks.length, webLike.chunks.length);
+      expect(safe.chunkSize, webLike.chunkSize);
+      for (int i = 0; i < safe.chunks.length; i++) {
+        expect(safe.chunks[i].flag, webLike.chunks[i].flag);
+        expect(safe.chunks[i].data, webLike.chunks[i].data);
+        expect(safe.chunks[i].withResponse, isTrue, reason: '第 $i 块要求应答');
+      }
+      // web 版节奏下一定有「无响应」的块，两者因此可以区分。
+      expect(webLike.chunks.any((WriteImageChunk c) => !c.withResponse), isTrue);
+    });
   });
 }
