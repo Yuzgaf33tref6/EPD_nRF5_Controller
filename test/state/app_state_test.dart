@@ -26,6 +26,8 @@ AppState buildState({FakeBleService? ble, ImagePickService? picker}) => AppState
       imagePickService: picker,
       scanDelay: Duration.zero,
       connectDelay: Duration.zero,
+      // 关掉自动重连：否则「意外断开」的用例会被自动接回去。
+      autoReconnect: false,
     );
 
 /// 固定返回一张图的选图服务，用来避免测试碰真实相册。
@@ -105,7 +107,11 @@ void main() {
       expect(state.notificationLog.last, contains('mtu=20'));
       // 连接时主动协商到 247；固件那条过时的 mtu=20 不会把协商结果打回去。
       expect(state.mtu, 247);
-      expect(state.writeChunkBytes, 244);
+      // 一条写请求最多 ATT_MTU - 3 = 244 字节；再减命令字与 flag，并压到
+      // kMaxChunkDataBytes(180) 以内，避免外设接收缓冲被顶满。
+      expect(state.writeMtu, 244);
+      expect(state.writeChunkBytes, 180);
+      expect(state.planMtu, 182);
     });
 
     test('意外断开时把连接状态清掉并记错误日志', () async {

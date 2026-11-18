@@ -71,7 +71,9 @@ class AppState extends ChangeNotifier {
     ImagePickService? imagePickService,
     Duration scanDelay = const Duration(milliseconds: 700),
     Duration connectDelay = const Duration(milliseconds: 450),
+    bool autoReconnect = true,
   })  : _scanDelay = scanDelay,
+        _autoReconnect = autoReconnect,
         _imagePick = imagePickService ?? GalleryImagePickService(),
         _ble = bleService ??
             FakeBleService(scanDelay: scanDelay, connectDelay: connectDelay) {
@@ -87,6 +89,10 @@ class AppState extends ChangeNotifier {
 
   final EpdBleService _ble;
   final Duration _scanDelay;
+
+  /// 意外断开后是否自动重连（默认真机开启，测试里关掉以保证确定性）。
+  final bool _autoReconnect;
+  bool _reconnecting = false;
 
   final ImagePickService _imagePick;
 
@@ -120,8 +126,23 @@ class AppState extends ChangeNotifier {
   /// 写指令，在 nRF51 上既慢又会把蓝牙缓冲撑爆（GATT 133 后系统直接拆连接）。
   static const int _targetMtu = 247;
 
+  /// 单条图像写指令最多带多少字节有效负载。见 [writeChunkBytes] 的说明。
+  static const int kMaxChunkDataBytes = 180;
+
+  /// 两条写指令之间的最小间隔，给外设留出把数据吞下去的时间。
+  static const Duration kInterChunkDelay = Duration(milliseconds: 12);
+
+  /// 单条写指令的超时：超过这个时间没有任何应答就认为链路已经废了。
+  ///
+  /// Android 自己会在 30 秒后抛 GATT 133 并拆掉连接 —— 那太晚了，等待期间界面
+  /// 完全没反馈。8 秒足够覆盖最慢的一次写（实测约 90ms），又不至于让人干等。
+  static const Duration kWriteTimeout = Duration(seconds: 8);
+
   /// 是否往 logcat 打印每条写指令（诊断页开关）。
-  bool _verboseTransfers = false;
+  ///
+  /// 默认开启：本 App 目前不持久化设置，默认关闭的话每次重连后都要跑去诊断页
+  /// 手动打开，排查问题太费劲。正式发布前再考虑改成可持久化的开关。
+  bool _verboseTransfers = true;
 
   // ---- 图像与驱动 ----
   EpdDriver _driver = _defaultDriver;
@@ -156,12 +177,30 @@ class AppState extends ChangeNotifier {
   bool get rleSupported => _rleSupported;
   int get interleavedCount => _interleavedCount;
 
-  /// 传给 `planWriteImage` 的 mtu 参数：它内部按 `mtu - 2` 分块，而 ATT 写请求
-  /// 最多只能带 `ATT_MTU - 3` 字节，所以这里减 1 让最终分块正好是 `_mtu - 3`。
-  int get writeMtu => _mtu > 4 ? _mtu - 1 : 3;
+  /// 传给 `planWriteImage` 的 mtu 参数：它内部按 `mtu - 2` 分块，块内再加上
+  /// 命令字与 flag 两个字节，所以这个参数就是「一条 ATT 写请求的总字节数上限」。
+  ///
+  /// ATT 写请求最多只能带 `ATT_MTU - 3` 字节（1 字节 opcode + 2 字节 handle）。
+  /// 一旦超过这个长度，Android 的 BLE 栈会自动改用「长写」（Prepare Write + Execute
+  /// Write）把它拆成多个 ATT 包；而固件的写回调是按「整包就是一条命令」实现的，
+  /// 会把拆出来的碎片当成独立命令处理 —— 于是 RLE 流被切断、固件卡住不应答，
+  /// 30 秒后 Android 以 GATT 133 拆掉连接（用户看到的就是「连接莫名其妙断开」）。
+  /// 因此这里必须严格用 `ATT_MTU - 3`，多一个字节都不行。
+  int get writeMtu => _mtu > 3 ? _mtu - 3 : 20;
 
-  /// 每块最多写多少字节有效负载（展示用）。
-  int get writeChunkBytes => writeMtu - 2;
+  /// 每块最多写多少字节有效负载（展示用）：总上限再减去命令字与 flag。
+  ///
+  /// 再额外压到 [kMaxChunkDataBytes]：nRF51 的 SoftDevice 链路层 PDU 只有 27 字节，
+  /// 一个 240 多字节的 ATT 写请求要被拆成十来个链路层包，外设的接收缓冲很容易在
+  /// 连续发送时被顶满（顶满后它就不回 ATT 响应了，Android 等 30 秒超时后以 GATT 133
+  /// 拆连接）。压到 180 字节能让「一个连接事件里传完」的概率高很多。
+  int get writeChunkBytes {
+    final int byMtu = writeMtu - 2;
+    return byMtu > kMaxChunkDataBytes ? kMaxChunkDataBytes : byMtu;
+  }
+
+  /// 传给 `planWriteImage` 的实测值：每块数据 + 命令字 + flag。
+  int get planMtu => writeChunkBytes + 2;
 
   /// 是否把每条写指令打到 logcat。
   bool get verboseTransfers => _verboseTransfers;
@@ -251,7 +290,7 @@ class AppState extends ChangeNotifier {
       driver: _driver,
       colorMode: colorMode,
       canvasSizeName: canvasSize.name,
-      mtu: writeMtu,
+      mtu: planMtu,
       rleSupported: _rleSupported,
       interleavedCount: _interleavedCount,
       // 真机上必须一条一条等确认：连续几十条无响应写会撑爆蓝牙缓冲，
@@ -425,7 +464,8 @@ class AppState extends ChangeNotifier {
     if (_connected == null) {
       return;
     }
-    final String name = _connected!.name;
+    final EpdBleDevice device = _connected!;
+    final String name = device.name;
     _connected = null;
     _firmwareVersion = null;
     _config = null;
@@ -436,9 +476,47 @@ class AppState extends ChangeNotifier {
     addLog(
       LogLevel.error,
       '与 $name 的连接已断开（设备主动断开或蓝牙链路中断）。'
-      '写入过快、距离过远、屏幕正在刷新都可能触发，请重新连接。',
+      '写入过快、距离过远、屏幕正在刷新都可能触发。',
     );
     notifyListeners();
+    if (_autoReconnect) {
+      unawaited(_tryAutoReconnect(device));
+    } else {
+      addLog(LogLevel.info, '请到「设备连接」页手动重新连接。');
+    }
+  }
+
+  /// 意外断开后自动重连（最多 3 次，间隔递增）。
+  ///
+  /// Android 不会主动维持 BLE 连接，链路一断 App 就成了「假连接」；
+  /// 与其让人手动点，不如自己重试几次，多数情况下第一次就能接回来。
+  Future<void> _tryAutoReconnect(EpdBleDevice device) async {
+    if (_reconnecting) {
+      return;
+    }
+    _reconnecting = true;
+    try {
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        if (_connected != null) {
+          return;
+        }
+        addLog(LogLevel.info, '尝试自动重连 $attempt/3 …');
+        notifyListeners();
+        await Future<void>.delayed(Duration(milliseconds: 800 * attempt));
+        if (_connected != null) {
+          return;
+        }
+        await connect(device);
+        if (_connected != null) {
+          addLog(LogLevel.success, '已自动重连 ${device.name}');
+          return;
+        }
+      }
+      addLog(LogLevel.error, '自动重连失败，请到「设备连接」页手动连接。');
+      notifyListeners();
+    } finally {
+      _reconnecting = false;
+    }
   }
 
   Future<void> disconnect() async {
@@ -630,28 +708,46 @@ class AppState extends ChangeNotifier {
     final int progressStep = total > 40 ? total ~/ 10 : 0;
     try {
       for (final EpdWrite write in plan.writes) {
+        final int index = sent + 1;
+        // 先打「即将发」这一行：万一这条卡住，logcat 最后一行就是卡住的那条。
+        if (_verboseTransfers) {
+          debugPrint(
+            '[EPD] > #$index/$total cmd=0x'
+            '${write.payload.first.toRadixString(16).padLeft(2, '0')} '
+            'len=${write.payload.length} reply=${write.withResponse}',
+          );
+        }
         await _writeWithRetry(write);
         sent++;
         _writesSent++;
         if (_verboseTransfers) {
           debugPrint(
-            '[EPD] #$sent/$total cmd=0x${write.payload.first.toRadixString(16).padLeft(2, '0')} '
-            'len=${write.payload.length} reply=${write.withResponse} '
-            'bytes=${_hex(write.payload)}',
+            '[EPD] < #$sent/$total ok bytes=${_hex(write.payload)}',
           );
         }
         if (progressStep > 0 && sent % progressStep == 0 && sent < total) {
           addLog(LogLevel.info, '发送中 $sent/$total');
           notifyListeners();
         }
+        // 给外设留喘气时间：nRF51 一次连接事件里吞不下太多数据，
+        // 连着灌会把它的接收缓冲顶满，然后它就再也不回 ATT 响应了。
+        if (sent < total) {
+          await Future<void>.delayed(kInterChunkDelay);
+        }
       }
     } catch (error) {
       addLog(
         LogLevel.error,
         '发送中断（已发 $sent/$total 条）：$error '
-        '${_connected == null ? '连接已断开，请重新连接。' : '可以重试一次；仍失败请缩短距离或降低 MTU。'}',
+        '${_connected == null ? '连接已断开，正在尝试自动重连。' : '可以重试一次；仍失败就缩短距离。'}',
       );
       notifyListeners();
+      // 卡住的写指令意味着链路已经废了：主动断开把挂起的 GATT 事务丢掉，
+      // 再走「意外断开」那条路，让自动重连接管恢复。
+      if (_connected != null) {
+        await _ble.disconnect();
+        _handleUnexpectedDisconnect();
+      }
       return;
     }
 
@@ -672,12 +768,21 @@ class AppState extends ChangeNotifier {
   ///
   /// Android 上 GATT 133 常常是瞬时的（蓝牙缓冲瞬间满），重试一次往往就过去了；
   /// 连续三次仍失败说明链路真的不行，交给上层报错。
+  ///
+  /// 另外每条写都套 [kWriteTimeout]：真机上出现过「写出去、设备不回、Android
+  /// 干等 30 秒才报 133」的情况，期间界面完全卡住没有反馈。超时不重试（那条
+  /// ATT 事务还挂在那儿，重试只会排队），直接抛出去让上层断开重连。
   Future<void> _writeWithRetry(EpdWrite write, {int attempts = 3}) async {
     Object? lastError;
     for (int attempt = 1; attempt <= attempts; attempt++) {
       try {
-        await _ble.write(write.payload, withResponse: write.withResponse);
+        await _ble
+            .write(write.payload, withResponse: write.withResponse)
+            .timeout(kWriteTimeout);
         return;
+      } on TimeoutException catch (error) {
+        throw StateError('设备 ${kWriteTimeout.inSeconds} 秒内没有确认这条写指令'
+            '（payload ${write.payload.length} 字节），链路已经不可用：$error');
       } catch (error) {
         lastError = error;
         if (attempt < attempts) {
