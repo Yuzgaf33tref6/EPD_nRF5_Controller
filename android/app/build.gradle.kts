@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -9,7 +11,7 @@ plugins {
 // 本地没有这个文件时退回 debug 签名，保证 `flutter build apk` 仍然能跑。
 // 签名固定下来之后，新包才能直接覆盖安装旧包（否则每次都得先卸载）。
 val keyPropertiesFile = rootProject.file("key.properties")
-val keyProperties = java.util.Properties()
+val keyProperties = Properties()
 if (keyPropertiesFile.exists()) {
     keyPropertiesFile.inputStream().use { keyProperties.load(it) }
 }
