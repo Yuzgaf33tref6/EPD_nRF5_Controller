@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../image/epd_color.dart';
 import '../state/app_state.dart';
 import '../widgets/log_panel.dart';
 import '../widgets/section_card.dart';
+
+/// 纯色测试用的三个颜色（黑 / 白 / 红，即三色屏的全部基色）。
+final List<EpdColor> _solidTestColors = <EpdColor>[
+  rgbPalette[0],
+  rgbPalette[1],
+  rgbPalette[3],
+];
 
 /// 蓝牙诊断页：把链路层面的真实状态摊开，方便在没有真机现场时定位问题。
 ///
@@ -95,6 +103,36 @@ class DiagnosticsScreen extends StatelessWidget {
                       Text(
                         '若「扫描不到设备」，先确认系统里的蓝牙已打开、'
                         '「附近的设备」权限已允许；Android 11 及以下还需要定位权限。',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SectionCard(
+                  title: '纯色测试（查平面极性）',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          for (final EpdColor color in _solidTestColors)
+                            OutlinedButton(
+                              onPressed: state.isConnected
+                                  ? () => state.sendSolidColor(color)
+                                  : null,
+                              child: Text(color.name),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '分别发一次全黑 / 全白 / 全红，屏幕应当整屏变成对应颜色：\n'
+                        '· 发全黑却出来红色 → 黑白平面与红白平面搞反了；\n'
+                        '· 发全红却出来白色（或反之）→ 红白平面极性相反；\n'
+                        '· 三个都对 → 数据链路没问题，问题在抖动后的图本身。',
                         style: theme.textTheme.bodySmall,
                       ),
                     ],

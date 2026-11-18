@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:epd_controller/devices/epd_driver.dart';
 import 'package:epd_controller/image/canvas_editing.dart';
 import 'package:epd_controller/image/dither.dart';
+import 'package:epd_controller/image/epd_color.dart';
 import 'package:epd_controller/image/rgba_image.dart';
 import 'package:epd_controller/models/transfer_speed.dart';
 import 'package:epd_controller/protocol/epd_protocol.dart';
@@ -132,6 +133,24 @@ void main() {
       expect(state.writeChunkBytes, 242);
       // 档位变了必须让传图计划重算（缓存键里带了档位）。
       expect(state.transferPlan.totalWrites, greaterThan(1));
+    });
+
+    test('发送纯色测试会完整走 INIT → 图像 → REFRESH', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+      final int before = ble.writtenPayloads.length;
+
+      await state.sendSolidColor(rgbPalette[0]);
+
+      final List<Uint8List> sent = ble.writtenPayloads.sublist(before);
+      expect(sent.length, greaterThan(2));
+      expect(sent.first.first, EpdCmd.init.code);
+      expect(sent.last.first, EpdCmd.refresh.code);
+      // 纯色图经过 RLE 后每个平面只剩极少几条，所以条数远小于满图的 1667 条。
+      expect(sent.length, lessThan(20));
     });
 
     test('意外断开时把连接状态清掉并记错误日志', () async {

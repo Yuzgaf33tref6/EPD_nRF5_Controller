@@ -704,7 +704,52 @@ class AppState extends ChangeNotifier {
     if (!_requireConnected('发送图片')) {
       return;
     }
-    final ImageTransferPlan plan = transferPlan;
+    await _sendPlan(transferPlan);
+  }
+
+  /// 发一张纯色图（诊断用）。
+  ///
+  /// 三色屏只有黑/白/红三种颜色，所以「纯黑 / 纯白 / 纯红」三个测试就能把
+  /// 平面极性和打包顺序全部定死：
+  /// - 发纯黑却出现红色 → 红白平面与黑白平面搞反了（或红平面极性相反）；
+  /// - 发纯红却出现白色 → 红平面极性相反；
+  /// - 三个都正常 → 说明数据链路对，问题在抖动后的图本身。
+  Future<void> sendSolidColor(EpdColor color) async {
+    final String name = '纯色测试 ${color.name}';
+    if (!_requireConnected(name)) {
+      return;
+    }
+    final int w = canvasSize.width;
+    final int h = canvasSize.height;
+    final RgbaImage image = RgbaImage(w, h);
+    for (int i = 0; i < w * h; i++) {
+      final int offset = i * 4;
+      image.data[offset] = color.r;
+      image.data[offset + 1] = color.g;
+      image.data[offset + 2] = color.b;
+      image.data[offset + 3] = 255;
+    }
+    final ImageTransferPlan plan = planImageTransfer(
+      image: image,
+      driver: _driver,
+      colorMode: colorMode,
+      canvasSizeName: canvasSize.name,
+      mtu: planMtu,
+      rleSupported: _rleSupported,
+      interleavedCount: _interleavedCount,
+      alwaysWithResponse: true,
+    );
+    addLog(
+      LogLevel.info,
+      '$name：RGB(${color.r},${color.g},${color.b}) 值=0x'
+      '${color.value.toRadixString(16).padLeft(2, '0')} / '
+      '${plan.totalWrites} 条写指令 / ${plan.processedBytes} 字节',
+    );
+    await _sendPlan(plan);
+  }
+
+  /// 把一份传图计划真正写到设备上（发送、重试、进度、刷新说明都在这里）。
+  Future<void> _sendPlan(ImageTransferPlan plan) async {
     addLog(
       LogLevel.info,
       '开始发送：${plan.totalWrites} 条写指令 / ${plan.processedBytes} 字节 / '
