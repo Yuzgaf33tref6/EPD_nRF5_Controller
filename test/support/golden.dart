@@ -29,6 +29,29 @@ RgbaImage imageFromGolden(Map<String, dynamic> entry) {
   return RgbaImage(width, height, base64Decode(entry['rgba_base64'] as String));
 }
 
+/// 逐字节比较任意字节序列（不假设是 RGBA），失败时报告下标与前几个字节。
+void expectBytesMatchGoldenPayload(
+  String expectedBase64,
+  List<int> actual,
+  String label,
+) {
+  final Uint8List expected = base64Decode(expectedBase64);
+  if (expected.length != actual.length) {
+    fail('$label 长度不一致：期望 ${expected.length}，实际 ${actual.length}');
+  }
+  for (int i = 0; i < expected.length; i++) {
+    if (expected[i] != actual[i]) {
+      final int from = i - 4 < 0 ? 0 : i - 4;
+      final int to = i + 5 > expected.length ? expected.length : i + 5;
+      fail(
+        '$label 第 $i 字节不一致：期望 ${expected[i]}，实际 ${actual[i]}\n'
+        '期望片段 ${expected.sublist(from, to)}\n'
+        '实际片段 ${actual.sublist(from, to)}',
+      );
+    }
+  }
+}
+
 /// 逐字节比较，失败时报告第一个不一致的字节和它所在的像素/通道，避免只看到两串长 base64。
 void expectBytesMatchGolden(String expectedBase64, Uint8List actual) {
   final Uint8List expected = base64Decode(expectedBase64);
