@@ -107,6 +107,11 @@ class ReactiveBleService implements EpdBleService {
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
 
+  /// 还没有人监听时先攒着：固件常在连接成功的那一瞬间就推「配置通知」，
+  /// 而 broadcast 流在没有监听者时会把这些事件直接丢掉（驱动号/引脚就丢了）。
+  final List<Uint8List> _pendingNotifications = <Uint8List>[];
+  bool _notificationsClaimed = false;
+
   final StreamController<bool> _connectionChanges =
       StreamController<bool>.broadcast();
 
@@ -146,7 +151,22 @@ class ReactiveBleService implements EpdBleService {
   String? get connectedDeviceId => _deviceId;
 
   @override
-  Stream<Uint8List> get notifications => _notifications.stream;
+  Stream<Uint8List> get notifications {
+    if (_notificationsClaimed) {
+      return _notifications.stream;
+    }
+    _notificationsClaimed = true;
+    final List<Uint8List> replay = List<Uint8List>.of(_pendingNotifications);
+    _pendingNotifications.clear();
+    return Stream<Uint8List>.multi((StreamController<Uint8List> controller) {
+      for (final Uint8List value in replay) {
+        controller.add(value);
+      }
+      final StreamSubscription<Uint8List> subscription =
+          _notifications.stream.listen(controller.add);
+      controller.onCancel = subscription.cancel;
+    });
+  }
 
   @override
   Future<BlePermissionResult> ensurePermissions() async {
@@ -300,7 +320,14 @@ class ReactiveBleService implements EpdBleService {
     _notificationSubscription = _ble
         .subscribeToCharacteristic(_commandCharacteristic(deviceId))
         .listen(
-      (List<int> value) => _notifications.add(Uint8List.fromList(value)),
+      (List<int> value) {
+        final Uint8List bytes = Uint8List.fromList(value);
+        if (_notificationsClaimed) {
+          _notifications.add(bytes);
+        } else {
+          _pendingNotifications.add(bytes);
+        }
+      },
       onError: (Object error) {
         // 通知订阅失败不影响已有连接，交给上层日志体现。
       },
@@ -312,6 +339,8 @@ class ReactiveBleService implements EpdBleService {
     final bool wasConnected = _isConnected;
     await _notificationSubscription?.cancel();
     _notificationSubscription = null;
+    _pendingNotifications.clear();
+    _notificationsClaimed = false;
     await _connectionSubscription?.cancel();
     _connectionSubscription = null;
     _isConnected = false;

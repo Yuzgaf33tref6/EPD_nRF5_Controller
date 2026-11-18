@@ -453,6 +453,14 @@ class AppState extends ChangeNotifier {
     _connected = device;
     _sawConfigNotification = false;
 
+    // 通知监听要抢在一切 await 之前挂上：固件往往在连接成功的瞬间就推一条
+    // 「配置通知」（7 字节引脚 + 驱动 id），如果先去协商 MTU / 读版本再订阅，
+    // 这条通知就丢了 —— 表现是驱动号一直停在默认值、引脚也不对。
+    _rleSupported = false;
+    await _notificationSubscription?.cancel();
+    _notificationSubscription =
+        _ble.notifications.listen(_handleNotification);
+
     // 先协商 MTU 再传图：默认 ATT MTU 只有 23（每次写 20 字节），400×300 三色
     // 一次要发上千条，既慢又容易让 nRF51 的蓝牙缓冲溢出。
     int negotiatedMtu = _mtu;
@@ -474,9 +482,6 @@ class AppState extends ChangeNotifier {
     // `html/js/main.js:404`）。以前这里按版本号猜「>= 0x16 就支持 RLE」，
     // 结果在 0x19 的固件上打开了 RLE，而该固件并不支持 —— 屏幕刷出来
     // 全是乱块（每行的空白被当成 run code 吞掉）。默认关，等通知再说。
-    _rleSupported = false;
-    _notificationSubscription =
-        _ble.notifications.listen(_handleNotification);
 
     // 监听意外断开：设备被写爆 / 走远 / 面板忙都会让系统静默拆连接，
     // 不监听的话界面会一直显示「已连接」，实际已经发不出去了。
