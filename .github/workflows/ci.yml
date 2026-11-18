@@ -45,6 +45,29 @@ jobs:
           dart --version
           java -version
 
+      # release 签名：从 Secrets 还原固定的 keystore，这样每次构建出来的 APK
+      # 签名一致，可以直接覆盖安装上一版（否则 Android 会因为签名不同而拒绝）。
+      - name: Prepare release signing (from secrets)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::没有 ANDROID_KEYSTORE_BASE64，release 将退回 debug 签名（无法覆盖安装旧包）"
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/epd-release.p12
+          cat > android/key.properties <<EOF
+          storeFile=app/epd-release.p12
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          EOF
+          echo "release 签名配置就绪：$(grep -c . android/key.properties) 行"
+
       - name: Resolve dependencies
         run: flutter pub get
 

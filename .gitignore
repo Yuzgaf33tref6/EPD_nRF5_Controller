@@ -46,3 +46,9 @@ app.*.map.json
 # Android 本机配置与生成物（由 flutter 工具在构建时生成，不应提交）
 /android/local.properties
 /android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+
+# release 签名材料（CI 从 Actions Secrets 还原，绝不提交）
+/android/key.properties
+/android/app/*.p12
+/android/app/*.jks
+/android/app/*.keystore
