@@ -76,6 +76,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('蓝牙诊断'), findsWidgets);
     expect(find.text('链路状态'), findsOneWidget);
+    // 诊断页内容超过一屏，通知卡片在折叠线以下，要先滚过去再断言。
+    await tester.scrollUntilVisible(
+      find.textContaining('还没有收到通知'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.textContaining('还没有收到通知'), findsOneWidget);
 
     await tester.pageBack();
