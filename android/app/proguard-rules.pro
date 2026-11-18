@@ -14,3 +14,9 @@
 
 # 保留注解元数据（插件里的 @Keep / 运行时校验会用到）。
 -keepattributes *Annotation*
+
+# Play Core 相关类只在「延迟组件（deferred components）」里被 Flutter 引擎引用，
+# 而延迟组件是上架 Google Play 才需要的可选特性，本项目不用，也没有引入
+# com.google.android.play:core 依赖。R8 检查到这些「被引用但不存在的类」会直接
+# 报 Missing class 并中断构建，所以显式关掉对这些类的警告。
+-dontwarn com.google.android.play.core.**
