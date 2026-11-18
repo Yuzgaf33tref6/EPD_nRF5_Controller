@@ -127,8 +127,11 @@ class AppState extends ChangeNotifier {
   /// 写指令，在 nRF51 上既慢又会把蓝牙缓冲撑爆（GATT 133 后系统直接拆连接）。
   static const int _targetMtu = 247;
 
-  /// 分块档位：稳妥（18，与 web 版默认一致）/ 快速（64）/ 极限（180）/ 自定义。
-  TransferSpeed _speed = TransferSpeed.conservative;
+  /// 分块档位：稳定 18 / 正常 64 / 快速 128 / 最大吃满 / 自定义。
+  TransferSpeed _speed = TransferSpeed.normal;
+
+  /// 自定义档每块的字节数（只在 [TransferSpeed.custom] 下生效）。
+  int _customChunkBytes = 128;
 
   /// 排查开关：调换黑白/红白两个显存平面。
   bool _swapPlanes = false;
@@ -200,14 +203,16 @@ class AppState extends ChangeNotifier {
 
   /// 每块最多写多少字节有效负载（展示用）：总上限再减去命令字与 flag。
   ///
-  /// 具体上限由 [speed] 决定：稳妥 18（与 web 版默认一致）、快速 64、极限 180、
-  /// 自定义则按 MTU 推算（`ATT_MTU - 3 - 2`）。之所以要压小：nRF51 的 SoftDevice
-  /// 链路层 PDU 只有 27 字节，一个两百多字节的 ATT 写请求要被拆成十来个链路层
-  /// 包，外设接收缓冲在连续发送时很容易被顶满（顶满后它就不回 ATT 响应了，
-  /// Android 等 30 秒超时后以 GATT 133 拆连接）。
+  /// 上限由 [speed] 决定：稳定 18 / 正常 64 / 快速 128 / 最大吃满（`MTU-3-2`）/
+  /// 自定义按用户填的字节数。真机验证过 242（MTU 247 的理论上限）也能稳定传完，
+  /// 所以档位现在只影响速度，不再是稳定性保险。
   int get writeChunkBytes {
     final int byMtu = writeMtu - 2;
     if (_speed.isCustom) {
+      final int custom = _customChunkBytes;
+      return custom > byMtu ? byMtu : (custom < 8 ? 8 : custom);
+    }
+    if (_speed.isMax) {
       return byMtu;
     }
     final int preset = _speed.presetChunkBytes;
@@ -962,6 +967,21 @@ class AppState extends ChangeNotifier {
       LogLevel.info,
       '分块档位：${value.label}（每块 $writeChunkBytes 字节）',
     );
+    notifyListeners();
+  }
+
+  /// 自定义档每块的字节数。
+  int get customChunkBytes => _customChunkBytes;
+
+  /// 设置自定义档每块的字节数（夹到 8..当前 MTU 上限）。
+  void setCustomChunkBytes(int value) {
+    final int max = writeMtu - 2;
+    final int clamped = value < 8 ? 8 : (value > max ? max : value);
+    if (clamped == _customChunkBytes) {
+      return;
+    }
+    _customChunkBytes = clamped;
+    addLog(LogLevel.info, '自定义分块：每块 $clamped 字节');
     notifyListeners();
   }
 

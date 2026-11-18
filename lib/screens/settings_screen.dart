@@ -10,6 +10,10 @@ import '../widgets/section_card.dart';
 int _chunkBytesFor(TransferSpeed speed, AppState state) {
   final int byMtu = state.writeMtu - 2;
   if (speed.isCustom) {
+    final int custom = state.customChunkBytes;
+    return custom > byMtu ? byMtu : custom;
+  }
+  if (speed.isMax) {
     return byMtu;
   }
   final int preset = speed.presetChunkBytes;
@@ -19,15 +23,27 @@ int _chunkBytesFor(TransferSpeed speed, AppState state) {
 /// 档位的一句话说明。
 String _speedHint(TransferSpeed speed) {
   switch (speed) {
-    case TransferSpeed.conservative:
+    case TransferSpeed.stable:
       return '18 字节，与 web 版默认值一致，最稳但最慢（400×300 三色约 1600 条写）。';
+    case TransferSpeed.normal:
+      return '64 字节，日常推荐。';
     case TransferSpeed.fast:
-      return '64 字节，日常折中档。';
-    case TransferSpeed.extreme:
-      return '180 字节，最快；对固件接收缓冲最不友好，只在稳定后才用。';
+      return '128 字节，明显快一截。';
+    case TransferSpeed.max:
+      return '吃满单包上限（MTU 247 时是 242 字节），真机已验证稳定。';
     case TransferSpeed.custom:
-      return '按下面的 MTU 滑块推算，适合自己试。';
+      return '自己填每块字节数，上限随 MTU 变化。';
   }
+}
+
+/// 自定义分块滑块的位置（必须落在 min..max 之间，否则 Slider 会断言失败）。
+double _customSliderValue(AppState state) {
+  final double max = (state.writeMtu - 2).toDouble();
+  final double value = state.customChunkBytes.toDouble();
+  if (value < 8) {
+    return 8;
+  }
+  return value > max ? max : value;
 }
 
 /// 偏好设置：外观、传输参数、调试开关。
@@ -124,18 +140,19 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'MTU ${state.mtu} · 每块 ${state.writeChunkBytes} 字节',
+                        'MTU ${state.mtu} · 单包有效负载上限 '
+                        '${state.writeMtu} · 每块 ${state.writeChunkBytes} 字节',
                         style: theme.textTheme.bodyMedium,
                       ),
                       if (state.speed.isCustom)
                         Slider(
-                          value: state.mtu.toDouble(),
-                          min: 20,
-                          max: 247,
-                          divisions: 227,
-                          label: '${state.mtu}',
+                          value: _customSliderValue(state),
+                          min: 8,
+                          max: (state.writeMtu - 2).toDouble(),
+                          divisions: state.writeMtu - 10,
+                          label: '${state.customChunkBytes}',
                           onChanged: (double value) =>
-                              state.setMtu(value.round()),
+                              state.setCustomChunkBytes(value.round()),
                         ),
                       Text(
                         '交错块数 ${state.interleavedCount}',
@@ -151,8 +168,12 @@ class SettingsScreen extends StatelessWidget {
                             state.setInterleavedCount(value.round()),
                       ),
                       Text(
-                        'MTU 来自固件 INIT 之后的通知（web 版默认 20）；'
-                        '交错块数只在关闭「逐条等确认」时有意义。',
+                        'MTU 是单包（ATT）大小，与分块是两回事：'
+                        '连接后主动协商到 ${state.mtu}，一条写指令最多能带 '
+                        '${state.writeMtu} 字节（MTU-3）；再减掉命令字与 flag 就是 '
+                        '${state.writeMtu - 2} 字节有效负载。\n'
+                        '注意固件在通知里报的“mtu=244”其实是它自己能收的负载上限'
+                        '（MTU-3），不是 MTU 本身，所以会和这里的 ${state.mtu} 差 3。',
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),

@@ -111,26 +111,33 @@ void main() {
       // 连接时主动协商到 247；固件那条过时的 mtu=20 不会把协商结果打回去。
       expect(state.mtu, 247);
       // 一条写请求最多 ATT_MTU - 3 = 244 字节；再减命令字与 flag。默认档位是
-      // 「稳妥」（18 字节/块，与 web 版默认 MTU 20、chunkSize 18 一致）。
+      // 「正常」（64 字节/块）。
       expect(state.writeMtu, 244);
-      expect(state.speed, TransferSpeed.conservative);
-      expect(state.writeChunkBytes, 18);
-      expect(state.planMtu, 20);
+      expect(state.speed, TransferSpeed.normal);
+      expect(state.writeChunkBytes, 64);
+      expect(state.planMtu, 66);
     });
 
     test('切换分块档位会改变每块字节数', () {
       final AppState state = buildState();
-      // 未连接时 MTU 还是固件默认的 20，所以稳妥档被压到 ATT_MTU-3-2 = 15。
+      // 未连接时 MTU 还是固件默认的 20，所以各档都被压到 ATT_MTU-3-2 = 15。
       expect(state.writeChunkBytes, 15);
       state.setMtu(247);
-      expect(state.writeChunkBytes, 18);
-      expect(state.planMtu, 20);
-      state.setSpeed(TransferSpeed.fast);
       expect(state.writeChunkBytes, 64);
-      state.setSpeed(TransferSpeed.extreme);
-      expect(state.writeChunkBytes, 180);
+      state.setSpeed(TransferSpeed.stable);
+      expect(state.writeChunkBytes, 18);
+      state.setSpeed(TransferSpeed.fast);
+      expect(state.writeChunkBytes, 128);
+      state.setSpeed(TransferSpeed.max);
+      // 吃满 ATT_MTU-3-2 = 242。
+      expect(state.writeChunkBytes, 242);
+      expect(state.planMtu, 244);
       state.setSpeed(TransferSpeed.custom);
-      // 自定义档不设额外上限，直接吃满 ATT_MTU-3-2 = 242。
+      expect(state.writeChunkBytes, state.customChunkBytes);
+      state.setCustomChunkBytes(200);
+      expect(state.writeChunkBytes, 200);
+      // 自定义值会被夹到 MTU 上限内。
+      state.setCustomChunkBytes(9999);
       expect(state.writeChunkBytes, 242);
       // 档位变了必须让传图计划重算（缓存键里带了档位）。
       expect(state.transferPlan.totalWrites, greaterThan(1));
