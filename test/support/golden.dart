@@ -9,6 +9,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:epd_controller/image/rgba_image.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// 读取指定 golden 文件并解析为 JSON 对象。
 Map<String, dynamic> loadGoldenJson(String fileName) {
