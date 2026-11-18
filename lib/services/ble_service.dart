@@ -89,10 +89,17 @@ abstract class EpdBleService {
 
 /// 真实现：基于 flutter_reactive_ble。
 class ReactiveBleService implements EpdBleService {
-  ReactiveBleService({FlutterReactiveBle? ble})
-      : _ble = ble ?? FlutterReactiveBle();
+  ReactiveBleService({FlutterReactiveBle? ble}) : _injectedBle = ble;
 
-  final FlutterReactiveBle _ble;
+  /// 注入的实例（测试用）；为空时在第一次真正用到蓝牙时才创建单例。
+  ///
+  /// 不能在构造函数里直接 `FlutterReactiveBle()`：它的构造函数会立刻走平台通道
+  /// 初始化，如果此时 WidgetsBinding 还没初始化就会抛空指针。
+  final FlutterReactiveBle? _injectedBle;
+
+  FlutterReactiveBle? _bleInstance;
+
+  FlutterReactiveBle get _ble => _bleInstance ??= _injectedBle ?? FlutterReactiveBle();
 
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
@@ -174,7 +181,13 @@ class ReactiveBleService implements EpdBleService {
   @override
   Future<String> describeAdapterStatus() async {
     try {
-      return switch (_ble.status) {
+      final FlutterReactiveBle ble = _ble;
+      // statusStream 在订阅时会先 initialize()，能拿到真实适配器状态；
+      // 拿不到就退回当前缓存的 status，不让界面卡住。
+      final BleStatus status = await ble.statusStream
+          .first
+          .timeout(const Duration(seconds: 3), onTimeout: () => ble.status);
+      return switch (status) {
         BleStatus.unknown => '蓝牙状态未知（尚未初始化）',
         BleStatus.unsupported => '这台设备不支持 BLE',
         BleStatus.unauthorized => '未获得蓝牙使用授权',

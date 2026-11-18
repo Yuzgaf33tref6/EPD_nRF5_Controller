@@ -271,8 +271,31 @@ class AppState extends ChangeNotifier {
     addLog(LogLevel.info, '开始扫描附近设备 …');
     notifyListeners();
     try {
-      _devices = await _ble.scan(timeout: _scanDelay + const Duration(seconds: 5));
-      addLog(LogLevel.success, '扫描完成：发现 ${_devices.length} 台设备');
+      // 扫描前必须先拿到运行时权限：Android 12+ 没授「附近设备」权限时，
+      // 系统不会报错，只会静默扫不到任何设备。
+      final BlePermissionResult permission = await _ble.ensurePermissions();
+      if (!permission.granted) {
+        addLog(LogLevel.error, '扫描需要蓝牙权限：${permission.message}');
+        return;
+      }
+      final String adapterStatus = await _ble.describeAdapterStatus();
+      _adapterStatusText = adapterStatus;
+      addLog(LogLevel.info, '蓝牙状态：$adapterStatus');
+      if (adapterStatus != '蓝牙可用') {
+        addLog(LogLevel.warning, '蓝牙状态不理想，扫描可能扫不到设备');
+      }
+      _devices = await _ble.scan(
+        timeout: _scanDelay + const Duration(seconds: 5),
+      );
+      if (_devices.isEmpty) {
+        addLog(
+          LogLevel.warning,
+          '没有扫到设备：确认墨水屏已开机（按一下唤醒）、没连着别的手机，'
+          '并已允许「附近的设备」权限；部分机型还需要打开定位。',
+        );
+      } else {
+        addLog(LogLevel.success, '扫描完成：发现 ${_devices.length} 台设备');
+      }
     } catch (error) {
       addLog(LogLevel.error, '扫描失败：$error');
     } finally {

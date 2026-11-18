@@ -75,7 +75,7 @@ class FakeBleService implements EpdBleService {
   }
 
   @override
-  Future<String> describeAdapterStatus() async => '（模拟）蓝牙可用';
+  Future<String> describeAdapterStatus() async => '蓝牙可用';
 
   @override
   Future<List<EpdBleDevice>> scan({required Duration timeout}) async {
