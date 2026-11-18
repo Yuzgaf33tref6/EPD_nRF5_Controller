@@ -1,9 +1,34 @@
 import 'package:flutter/material.dart';
 
 import '../devices/epd_driver.dart';
+import '../models/transfer_speed.dart';
 import '../state/app_state.dart';
 import '../widgets/log_panel.dart';
 import '../widgets/section_card.dart';
+
+/// 某个档位在当前 MTU 下实际能用的每块有效负载字节数。
+int _chunkBytesFor(TransferSpeed speed, AppState state) {
+  final int byMtu = state.writeMtu - 2;
+  if (speed.isCustom) {
+    return byMtu;
+  }
+  final int preset = speed.presetChunkBytes;
+  return preset > byMtu ? byMtu : preset;
+}
+
+/// 档位的一句话说明。
+String _speedHint(TransferSpeed speed) {
+  switch (speed) {
+    case TransferSpeed.conservative:
+      return '18 字节，与 web 版默认值一致，最稳但最慢（400×300 三色约 1600 条写）。';
+    case TransferSpeed.fast:
+      return '64 字节，日常折中档。';
+    case TransferSpeed.extreme:
+      return '180 字节，最快；对固件接收缓冲最不友好，只在稳定后才用。';
+    case TransferSpeed.custom:
+      return '按下面的 MTU 滑块推算，适合自己试。';
+  }
+}
 
 /// 偏好设置：外观、传输参数、调试开关。
 class SettingsScreen extends StatelessWidget {
@@ -62,18 +87,56 @@ class SettingsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          const Text('分块档位'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButton<TransferSpeed>(
+                              isExpanded: true,
+                              value: state.speed,
+                              items: TransferSpeed.values
+                                  .map(
+                                    (TransferSpeed speed) =>
+                                        DropdownMenuItem<TransferSpeed>(
+                                      value: speed,
+                                      child: Text(
+                                        '${speed.label}（每块 '
+                                        '${_chunkBytesFor(speed, state)} 字节）',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (TransferSpeed? speed) {
+                                if (speed != null) {
+                                  state.setSpeed(speed);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       Text(
-                        'MTU ${state.mtu}',
+                        _speedHint(state.speed),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'MTU ${state.mtu} · 每块 ${state.writeChunkBytes} 字节',
                         style: theme.textTheme.bodyMedium,
                       ),
-                      Slider(
-                        value: state.mtu.toDouble(),
-                        min: 20,
-                        max: 247,
-                        divisions: 227,
-                        label: '${state.mtu}',
-                        onChanged: (double value) => state.setMtu(value.round()),
-                      ),
+                      if (state.speed.isCustom)
+                        Slider(
+                          value: state.mtu.toDouble(),
+                          min: 20,
+                          max: 247,
+                          divisions: 227,
+                          label: '${state.mtu}',
+                          onChanged: (double value) =>
+                              state.setMtu(value.round()),
+                        ),
                       Text(
                         '交错块数 ${state.interleavedCount}',
                         style: theme.textTheme.bodyMedium,
@@ -89,7 +152,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       Text(
                         'MTU 来自固件 INIT 之后的通知（web 版默认 20）；'
-                        '交错块数决定每多少块用一次有应答写入。',
+                        '交错块数只在关闭「逐条等确认」时有意义。',
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),

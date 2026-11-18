@@ -24,6 +24,7 @@ import '../image/dither.dart';
 import '../image/epd_color.dart';
 import '../image/rgba_image.dart';
 import '../image/sample_image.dart';
+import '../models/transfer_speed.dart';
 import '../protocol/epd_protocol.dart';
 import '../protocol/transfer.dart';
 import '../services/ble_service.dart';
@@ -126,6 +127,9 @@ class AppState extends ChangeNotifier {
   /// 写指令，在 nRF51 上既慢又会把蓝牙缓冲撑爆（GATT 133 后系统直接拆连接）。
   static const int _targetMtu = 247;
 
+  /// 分块档位：稳妥（18，与 web 版默认一致）/ 快速（64）/ 极限（180）/ 自定义。
+  TransferSpeed _speed = TransferSpeed.conservative;
+
   /// 单条图像写指令最多带多少字节有效负载。见 [writeChunkBytes] 的说明。
   static const int kMaxChunkDataBytes = 180;
 
@@ -190,13 +194,18 @@ class AppState extends ChangeNotifier {
 
   /// 每块最多写多少字节有效负载（展示用）：总上限再减去命令字与 flag。
   ///
-  /// 再额外压到 [kMaxChunkDataBytes]：nRF51 的 SoftDevice 链路层 PDU 只有 27 字节，
-  /// 一个 240 多字节的 ATT 写请求要被拆成十来个链路层包，外设的接收缓冲很容易在
-  /// 连续发送时被顶满（顶满后它就不回 ATT 响应了，Android 等 30 秒超时后以 GATT 133
-  /// 拆连接）。压到 180 字节能让「一个连接事件里传完」的概率高很多。
+  /// 具体上限由 [speed] 决定：稳妥 18（与 web 版默认一致）、快速 64、极限 180、
+  /// 自定义则按 MTU 推算（`ATT_MTU - 3 - 2`）。之所以要压小：nRF51 的 SoftDevice
+  /// 链路层 PDU 只有 27 字节，一个两百多字节的 ATT 写请求要被拆成十来个链路层
+  /// 包，外设接收缓冲在连续发送时很容易被顶满（顶满后它就不回 ATT 响应了，
+  /// Android 等 30 秒超时后以 GATT 133 拆连接）。
   int get writeChunkBytes {
     final int byMtu = writeMtu - 2;
-    return byMtu > kMaxChunkDataBytes ? kMaxChunkDataBytes : byMtu;
+    if (_speed.isCustom) {
+      return byMtu;
+    }
+    final int preset = _speed.presetChunkBytes;
+    return preset > byMtu ? byMtu : preset;
   }
 
   /// 传给 `planWriteImage` 的实测值：每块数据 + 命令字 + flag。
@@ -280,7 +289,7 @@ class AppState extends ChangeNotifier {
   ImageTransferPlan get transferPlan {
     final RgbaImage image = previewImage;
     final Object key = Object.hash(image, _driver.id, canvasSize.name, colorMode,
-        _mtu, _rleSupported, _interleavedCount);
+        _mtu, _rleSupported, _interleavedCount, _speed);
     final ImageTransferPlan? cached = _planCache;
     if (cached != null && _planCacheKey == key) {
       return cached;
@@ -847,6 +856,22 @@ class AppState extends ChangeNotifier {
       return;
     }
     _mtu = clamped;
+    notifyListeners();
+  }
+
+  /// 分块档位：稳妥 / 快速 / 极限 / 自定义。
+  TransferSpeed get speed => _speed;
+
+  /// 切换分块档位。切到自定义时，块大小由 MTU 滑块推算。
+  void setSpeed(TransferSpeed value) {
+    if (value == _speed) {
+      return;
+    }
+    _speed = value;
+    addLog(
+      LogLevel.info,
+      '分块档位：${value.label}（每块 $writeChunkBytes 字节）',
+    );
     notifyListeners();
   }
 

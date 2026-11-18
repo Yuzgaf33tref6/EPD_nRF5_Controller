@@ -7,6 +7,7 @@ import 'package:epd_controller/devices/epd_driver.dart';
 import 'package:epd_controller/image/canvas_editing.dart';
 import 'package:epd_controller/image/dither.dart';
 import 'package:epd_controller/image/rgba_image.dart';
+import 'package:epd_controller/models/transfer_speed.dart';
 import 'package:epd_controller/protocol/epd_protocol.dart';
 import 'package:epd_controller/protocol/transfer.dart';
 import 'package:epd_controller/services/ble_service.dart';
@@ -107,11 +108,26 @@ void main() {
       expect(state.notificationLog.last, contains('mtu=20'));
       // 连接时主动协商到 247；固件那条过时的 mtu=20 不会把协商结果打回去。
       expect(state.mtu, 247);
-      // 一条写请求最多 ATT_MTU - 3 = 244 字节；再减命令字与 flag，并压到
-      // kMaxChunkDataBytes(180) 以内，避免外设接收缓冲被顶满。
+      // 一条写请求最多 ATT_MTU - 3 = 244 字节；再减命令字与 flag。默认档位是
+      // 「稳妥」（18 字节/块，与 web 版默认 MTU 20、chunkSize 18 一致）。
       expect(state.writeMtu, 244);
+      expect(state.speed, TransferSpeed.conservative);
+      expect(state.writeChunkBytes, 18);
+      expect(state.planMtu, 20);
+    });
+
+    test('切换分块档位会改变每块字节数', () {
+      final AppState state = buildState();
+      expect(state.writeChunkBytes, 18);
+      state.setSpeed(TransferSpeed.fast);
+      expect(state.writeChunkBytes, 64);
+      state.setSpeed(TransferSpeed.extreme);
       expect(state.writeChunkBytes, 180);
-      expect(state.planMtu, 182);
+      state.setSpeed(TransferSpeed.custom);
+      // 未连接时 MTU 还是固件默认的 20，自定义档取 ATT_MTU-3-2 = 15。
+      expect(state.writeChunkBytes, 15);
+      state.setMtu(247);
+      expect(state.writeChunkBytes, 242);
     });
 
     test('意外断开时把连接状态清掉并记错误日志', () async {
