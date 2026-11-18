@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.epd_controller">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions for Bluetooth and location (some Android versions require location for BLE scan) -->
+    <!-- BLE 相关权限（老系统用蓝牙/定位，Android 12+ 用 BLUETOOTH_SCAN/CONNECT） -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Android 12+ permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
@@ -20,10 +18,20 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme">
+            <!-- 引擎首帧前切换到 NormalTheme，避免启动白屏闪烁 -->
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- 声明使用 Flutter v2 embedding。
+             缺失这一项时 flutter 工具会判定项目使用「已被删除的 v1 embedding」并直接失败；
+             另外 AGP 8 起 manifest 的 package="" 属性必须移除，命名空间改由 build.gradle.kts 的 namespace 提供。 -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
     </application>
 </manifest>
