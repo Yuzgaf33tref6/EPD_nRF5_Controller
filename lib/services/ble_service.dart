@@ -80,6 +80,12 @@ abstract class EpdBleService {
   /// 命令特征的通知流（连接后可用）。
   Stream<Uint8List> get notifications;
 
+  /// 重新打开通知（关掉 CCCD 再打开）。
+  ///
+  /// 固件只在收到「开启通知」时把配置结构体（引脚 + 驱动 id）推一次，
+  /// 一旦那条通知漏了，唯一的补救办法就是让 CCCD 重新打开一次。
+  Future<void> resubscribeNotifications();
+
   /// 连接状态变化：true = 已连接，false = 已断开（含意外断开）。
   Stream<bool> get connectionChanges;
 
@@ -268,6 +274,11 @@ class ReactiveBleService implements EpdBleService {
     }
     await disconnect();
 
+    // 每次连接都重新进入「攒着等监听者」的状态：固件只在收到 CCCD（开启通知）
+    // 的那一刻推一次「配置通知」，那条通知比 connect() 返回还早。
+    _pendingNotifications.clear();
+    _notificationsClaimed = false;
+
     final Completer<void> completer = Completer<void>();
     _deviceId = deviceId;
     _connectionSubscription = _ble
@@ -317,21 +328,44 @@ class ReactiveBleService implements EpdBleService {
     }
 
     // 订阅命令特征的通知。必须在连接成功之后，订阅内部会做服务发现。
+    _listenCommandNotifications(deviceId);
+  }
+
+  /// 把命令特征的原始字节灌进 [_notifications]（没人监听时先攒着）。
+  void _onCommandNotification(List<int> value) {
+    final Uint8List bytes = Uint8List.fromList(value);
+    if (_notificationsClaimed) {
+      _notifications.add(bytes);
+    } else {
+      _pendingNotifications.add(bytes);
+    }
+  }
+
+  void _listenCommandNotifications(String deviceId) {
     _notificationSubscription = _ble
         .subscribeToCharacteristic(_commandCharacteristic(deviceId))
         .listen(
-      (List<int> value) {
-        final Uint8List bytes = Uint8List.fromList(value);
-        if (_notificationsClaimed) {
-          _notifications.add(bytes);
-        } else {
-          _pendingNotifications.add(bytes);
-        }
-      },
+      _onCommandNotification,
       onError: (Object error) {
         // 通知订阅失败不影响已有连接，交给上层日志体现。
       },
     );
+  }
+
+  @override
+  Future<void> resubscribeNotifications() async {
+    final String? deviceId = _deviceId;
+    if (deviceId == null || !_isConnected) {
+      return;
+    }
+    // 先取消订阅（插件会写 CCCD=0），再重新订阅（CCCD=1）——
+    // 固件在 CCCD 打开时会把配置结构体推一次，这样就能补救漏掉的那条。
+    await _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    _pendingNotifications.clear();
+    _notificationsClaimed = false;
+    _listenCommandNotifications(deviceId);
   }
 
   @override

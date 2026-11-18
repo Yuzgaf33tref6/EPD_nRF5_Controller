@@ -515,6 +515,10 @@ class AppState extends ChangeNotifier {
     } catch (error) {
       addLog(LogLevel.error, '发送 INIT 失败：$error');
     }
+    // 固件只在「开启通知」那一刻推一次配置（引脚 + 驱动 id）。真机上这条通知
+    // 时不时会被系统吞掉，表现为驱动号停在默认值、引脚是 `-`。漏了就重开一次
+    // CCCD 让固件重发 —— 这是唯一能补救的办法。
+    await _ensureConfigNotification();
     _isConnecting = false;
     notifyListeners();
   }
@@ -603,6 +607,9 @@ class AppState extends ChangeNotifier {
   /// 判定方式与 web 版一致：连接后的第一条通知就是配置通知。这里多一道保险 ——
   /// 如果第一条看起来是纯 ASCII 文本（`mtu=…`），就按文本处理，避免把乱序通知当配置。
   void _handleNotification(Uint8List value) {
+    if (_verboseTransfers) {
+      debugPrint('[EPD] <notify len=${value.length} hex=${_hex(value)}');
+    }
     if (!_sawConfigNotification && !_looksLikeText(value) && value.length >= 8) {
       final EpdConfig config = parseConfigNotification(value);
       _sawConfigNotification = true;
@@ -654,8 +661,47 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _recordNotification(String entry) {
-    _notificationLog.add(entry);
+  /// 等到固件的「配置通知」（引脚 + 驱动 id）；等不到就重开一次 CCCD 让它重发。
+  Future<void> _ensureConfigNotification() async {
+    if (_config != null) {
+      return;
+    }
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      if (await _waitForConfig(const Duration(milliseconds: 900))) {
+        return;
+      }
+      if (attempt == 3) {
+        break;
+      }
+      addLog(
+        LogLevel.warning,
+        '还没收到固件的配置通知（引脚/驱动），第 $attempt 次重新打开通知 …',
+      );
+      try {
+        await _ble.resubscribeNotifications();
+      } catch (error) {
+        addLog(LogLevel.warning, '重新打开通知失败：$error');
+      }
+    }
+    addLog(
+      LogLevel.warning,
+      '固件始终没推配置通知：引脚与驱动未知，可以在「设备连接」页手动选驱动。',
+    );
+  }
+
+  /// 在 [timeout] 内轮询等待配置通知到达。
+  Future<bool> _waitForConfig(Duration timeout) async {
+    final DateTime deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (_config != null) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+    }
+    return _config != null;
+  }
+
+  void _recordNotification(String entry) {    _notificationLog.add(entry);
     if (_notificationLog.length > _maxNotificationLog) {
       _notificationLog.removeRange(
         0,

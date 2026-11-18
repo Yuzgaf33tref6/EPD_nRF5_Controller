@@ -79,6 +79,15 @@ class FakeBleService implements EpdBleService {
   Stream<Uint8List> get notifications => _notifications.stream;
 
   @override
+  Future<void> resubscribeNotifications() async {
+    if (!_isConnected) {
+      return;
+    }
+    // 真固件在 CCCD 重新打开时会把配置结构体再推一次，这里照样模拟。
+    _notifications.add(_configNotification());
+  }
+
+  @override
   Future<BlePermissionResult> ensurePermissions() async {
     if (!grantPermission) {
       return const BlePermissionResult(
