@@ -118,16 +118,20 @@ void main() {
 
     test('切换分块档位会改变每块字节数', () {
       final AppState state = buildState();
+      // 未连接时 MTU 还是固件默认的 20，所以稳妥档被压到 ATT_MTU-3-2 = 15。
+      expect(state.writeChunkBytes, 15);
+      state.setMtu(247);
       expect(state.writeChunkBytes, 18);
+      expect(state.planMtu, 20);
       state.setSpeed(TransferSpeed.fast);
       expect(state.writeChunkBytes, 64);
       state.setSpeed(TransferSpeed.extreme);
       expect(state.writeChunkBytes, 180);
       state.setSpeed(TransferSpeed.custom);
-      // 未连接时 MTU 还是固件默认的 20，自定义档取 ATT_MTU-3-2 = 15。
-      expect(state.writeChunkBytes, 15);
-      state.setMtu(247);
+      // 自定义档不设额外上限，直接吃满 ATT_MTU-3-2 = 242。
       expect(state.writeChunkBytes, 242);
+      // 档位变了必须让传图计划重算（缓存键里带了档位）。
+      expect(state.transferPlan.totalWrites, greaterThan(1));
     });
 
     test('意外断开时把连接状态清掉并记错误日志', () async {
