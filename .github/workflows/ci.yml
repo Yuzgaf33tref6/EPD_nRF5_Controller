@@ -60,12 +60,13 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      # 只编 arm64-v8a：现在的手机基本全是 arm64，其它架构纯属白占体积。
+      - name: Build debug APK (arm64 only)
+        run: flutter build apk --debug --target-platform android-arm64
 
-      # release 走 AOT，比 debug 小一个数量级；--split-per-abi 只打每种 CPU 架构自己的引擎。
-      - name: Build release APK (split per ABI)
-        run: flutter build apk --release --split-per-abi
+      # release 走 AOT，且 build.gradle.kts 里开了 R8 代码压缩 + 资源裁剪。
+      - name: Build release APK (arm64 only, R8 optimized)
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: Show APK sizes
         run: ls -lh build/app/outputs/flutter-apk/
