@@ -231,7 +231,7 @@ class AppState extends ChangeNotifier {
     _rleSupported = _firmwareVersion! >= kMinRleFirmwareVersion;
 
     addLog(LogLevel.success, '已连接 ${device.name}');
-    addLog(LogLevel.info, '固件版本 $_firmwareVersionText，'
+    addLog(LogLevel.info, '固件版本 $firmwareVersionText，'
         '驱动 id 0x${_driver.id.toUpperCase()}，引脚 $pinsText');
     addLog(
       LogLevel.info,
