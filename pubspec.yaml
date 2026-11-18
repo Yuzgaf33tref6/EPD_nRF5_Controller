@@ -35,5 +35,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+# 本地打过补丁的 reactive_ble_mobile（见 third_party/reactive_ble_mobile/PATCH.md）。
+# 补丁内容：通知订阅模式 DEFAULT → QUICK_SETUP。上游 DEFAULT 会丢掉「设备收到 CCCD
+# 写入后立刻推送的第一条通知」，而 EPD-nRF5 固件正是用这条通知上报引脚与驱动号，
+# 不改的话驱动自动识别永远拿不到数据。
+dependency_overrides:
+  reactive_ble_mobile:
+    path: third_party/reactive_ble_mobile
+
 flutter:
   uses-material-design: true
