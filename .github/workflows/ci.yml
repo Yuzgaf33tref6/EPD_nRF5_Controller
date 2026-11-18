@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [rebuild]
+  pull_request:
+    branches: [rebuild]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyze / Test / Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.50.0
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          set -x
+          flutter --version
+          dart --version
+          java -version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Show resolved dependency versions
+        run: |
+          echo '================ pubspec.lock ================'
+          cat pubspec.lock
+          echo '=============================================='
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

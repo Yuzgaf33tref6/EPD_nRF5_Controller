@@ -1,19 +1,18 @@
 name: epd_controller
-description: EPD controller - Flutter port skeleton
+description: EPD-nRF5 墨水屏控制器 Android 客户端
 publish_to: 'none'
-version: 0.0.1
+version: 0.1.0+1
+
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ^3.9.0
 
 dependencies:
   flutter:
     sdk: flutter
-  image: ^4.0.21
-  file_picker: ^5.2.6
-  flutter_reactive_ble: ^5.4.0
-  permission_handler: ^10.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/images/
