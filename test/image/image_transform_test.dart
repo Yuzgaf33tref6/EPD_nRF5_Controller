@@ -88,17 +88,18 @@ void main() {
 
   group('cropScaled', () {
     test('取左半边得到纯黑，输出尺寸即画布尺寸', () {
+      // 采样点落在 x∈[0,1] 区间内，两侧都是黑，所以不会混到白。
       final RgbaImage source = buildImage(
         4,
-        2,
+        4,
         (int x, int y) => x < 2 ? <int>[0, 0, 0] : <int>[255, 255, 255],
       );
       final RgbaImage cropped = cropScaled(
         source: source,
         left: 0,
         top: 0,
-        width: 2,
-        height: 2,
+        width: 1,
+        height: 1,
         outWidth: 10,
         outHeight: 6,
       );
@@ -114,15 +115,15 @@ void main() {
     test('取右半边得到纯白', () {
       final RgbaImage source = buildImage(
         4,
-        2,
+        4,
         (int x, int y) => x < 2 ? <int>[0, 0, 0] : <int>[255, 255, 255],
       );
       final RgbaImage cropped = cropScaled(
         source: source,
-        left: 2,
+        left: 3,
         top: 0,
-        width: 2,
-        height: 2,
+        width: 1,
+        height: 1,
         outWidth: 5,
         outHeight: 5,
       );
