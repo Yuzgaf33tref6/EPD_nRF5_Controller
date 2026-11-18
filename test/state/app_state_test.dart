@@ -118,11 +118,25 @@ void main() {
       expect(state.rleSupported, isFalse);
     });
 
-    test('权限被拒绝时不会去连接，并记一条错误日志', () async {
+    test('权限被拒绝时不去扫描也不去连接，并记错误日志', () async {
       final FakeBleService ble = buildFake(grantPermission: false);
       final AppState state = buildState(ble: ble);
       await state.scan();
-      await state.connect(state.devices.first);
+      // 扫描前就要权限，没权限时不会去扫，也就不会有设备。
+      expect(state.devices, isEmpty);
+      expect(
+        state.logs.any(
+          (LogEntry entry) => entry.message.contains('扫描需要蓝牙权限'),
+        ),
+        isTrue,
+      );
+      await state.connect(
+        const EpdBleDevice(
+          id: 'C4:7F:51:00:00:01',
+          name: 'EPD-4.2-BWR',
+          rssi: -46,
+        ),
+      );
       expect(state.isConnected, isFalse);
       expect(state.isConnecting, isFalse);
       expect(ble.writtenPayloads, isEmpty);
