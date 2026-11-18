@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'services/ble_service.dart';
 import 'state/app_state.dart';
 
 /// 应用根组件。
 ///
 /// 持有 [AppState]（唯一的状态源），并把它挂到 widget 树的最外层。
-/// 本轮是 UI 骨架：导航、画布预览、传图统计都是真的，蓝牙是假的。
+///
+/// [bleService] 为空时用模拟蓝牙（widget 测试走这条路，不需要真机与插件通道）；
+/// 真机入口在 `main.dart` 里传入 [ReactiveBleService]。
 class EpdControllerApp extends StatefulWidget {
-  const EpdControllerApp({super.key});
+  const EpdControllerApp({super.key, this.bleService});
+
+  final EpdBleService? bleService;
 
   @override
   State<EpdControllerApp> createState() => _EpdControllerAppState();
 }
 
 class _EpdControllerAppState extends State<EpdControllerApp> {
-  final AppState _state = AppState();
+  late final AppState _state = AppState(bleService: widget.bleService);
 
   @override
   void dispose() {

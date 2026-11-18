@@ -4,9 +4,15 @@
 /// [ChangeNotifier] + [InheritedNotifier] 组合。UI 通过 [AppStateScope.of] 拿到状态，
 /// 状态变化时自动重建。
 ///
-/// 这一层已经把纯 Dart 核心接通了：画布预览会真的跑对比度 → 抖动 → 传图编排，
-/// 所以界面上的「共 N 条写指令 / M 字节」是真算出来的，不是假数字。
+/// 这一层把三方接通了：
+/// 1. 纯 Dart 核心（对比度 → 抖动 → 位打包 → 传图编排）算出要发的每一个字节；
+/// 2. [EpdBleService] 负责真链路的读写（测试注入 [FakeBleService]）；
+/// 3. 通知解析复用 `lib/protocol/epd_protocol.dart` 里的 `parseConfigNotification` /
+///    `parseTextNotification`，与 web 版逐字节一致。
 library;
+
+import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -19,6 +25,7 @@ import '../image/rgba_image.dart';
 import '../image/sample_image.dart';
 import '../protocol/epd_protocol.dart';
 import '../protocol/transfer.dart';
+import '../services/ble_service.dart';
 import '../services/fake_ble_service.dart';
 
 /// 日志级别，决定日志面板里的颜色。
@@ -58,30 +65,45 @@ class AppStateScope extends InheritedNotifier<AppState> {
 /// 全局应用状态。
 class AppState extends ChangeNotifier {
   AppState({
+    EpdBleService? bleService,
     Duration scanDelay = const Duration(milliseconds: 700),
     Duration connectDelay = const Duration(milliseconds: 450),
-    Duration sendDelay = const Duration(milliseconds: 600),
   })  : _scanDelay = scanDelay,
         _connectDelay = connectDelay,
-        _sendDelay = sendDelay {
-    _sourceImage = sampleImage(_driver.canvasSize.width, _driver.canvasSize.height);
-    addLog(LogLevel.info, '就绪：纯 Dart 核心已接通，蓝牙层尚未接入');
+        _ble = bleService ??
+            FakeBleService(scanDelay: scanDelay, connectDelay: connectDelay) {
+    _sourceImage =
+        sampleImage(_driver.canvasSize.width, _driver.canvasSize.height);
+    addLog(
+      LogLevel.info,
+      bleService == null
+          ? '就绪：当前使用模拟蓝牙，可先熟悉界面与传图参数'
+          : '就绪：已注入蓝牙实现',
+    );
   }
 
-  final FakeBleService _ble = FakeBleService();
+  final EpdBleService _ble;
   final Duration _scanDelay;
   final Duration _connectDelay;
-  final Duration _sendDelay;
 
   /// 目标设备是 4.2 寸三色（驱动 0x03），所以默认选它而不是 web 版的第一项。
   static final EpdDriver _defaultDriver = driverById('03') ?? kEpdDrivers.first;
 
   // ---- 连接 ----
   bool _isScanning = false;
-  List<FakeEpdDevice> _devices = const <FakeEpdDevice>[];
-  FakeEpdDevice? _connected;
+  bool _isConnecting = false;
+  List<EpdBleDevice> _devices = const <EpdBleDevice>[];
+  EpdBleDevice? _connected;
   int? _firmwareVersion;
   EpdConfig? _config;
+  StreamSubscription<Uint8List>? _notificationSubscription;
+  bool _sawConfigNotification = false;
+  String _adapterStatusText = '未检查';
+  int _writesSent = 0;
+  final List<String> _notificationLog = <String>[];
+
+  /// 通知日志上限。
+  static const int _maxNotificationLog = 40;
 
   // ---- 传输参数 ----
   int _mtu = FakeBleService.mtu;
@@ -109,14 +131,26 @@ class AppState extends ChangeNotifier {
   // ============ 只读访问 ============
 
   bool get isScanning => _isScanning;
-  List<FakeEpdDevice> get devices => List<FakeEpdDevice>.unmodifiable(_devices);
-  FakeEpdDevice? get connectedDevice => _connected;
+  bool get isConnecting => _isConnecting;
+  List<EpdBleDevice> get devices =>
+      List<EpdBleDevice>.unmodifiable(_devices);
+  EpdBleDevice? get connectedDevice => _connected;
   bool get isConnected => _connected != null;
   int? get firmwareVersion => _firmwareVersion;
   EpdConfig? get config => _config;
   int get mtu => _mtu;
   bool get rleSupported => _rleSupported;
   int get interleavedCount => _interleavedCount;
+
+  /// 蓝牙子系统状态（诊断页用）。
+  String get adapterStatusText => _adapterStatusText;
+
+  /// 已成功写入的负载条数（诊断页用来确认链路真的通了）。
+  int get writesSent => _writesSent;
+
+  /// 最近收到的通知原文（诊断页用）。
+  List<String> get notificationLog =>
+      List<String>.unmodifiable(_notificationLog);
 
   EpdDriver get driver => _driver;
   EpdCanvasSize get canvasSize => _driver.canvasSize;
@@ -212,50 +246,181 @@ class AppState extends ChangeNotifier {
       return;
     }
     _isScanning = true;
-    addLog(LogLevel.info, '开始扫描（模拟数据，真实蓝牙尚未接入）');
-    await Future<void>.delayed(_scanDelay);
-    _devices = _ble.discover();
-    _isScanning = false;
-    addLog(LogLevel.success, '扫描完成：发现 ${_devices.length} 台设备');
+    addLog(LogLevel.info, '开始扫描附近设备 …');
     notifyListeners();
+    try {
+      _devices = await _ble.scan(timeout: _scanDelay + const Duration(seconds: 5));
+      addLog(LogLevel.success, '扫描完成：发现 ${_devices.length} 台设备');
+    } catch (error) {
+      addLog(LogLevel.error, '扫描失败：$error');
+    } finally {
+      _isScanning = false;
+      notifyListeners();
+    }
   }
 
-  Future<void> connect(FakeEpdDevice device) async {
-    addLog(LogLevel.info, '正在连接 ${device.name} …');
-    notifyListeners();
-    await Future<void>.delayed(_connectDelay);
-
-    _connected = device;
-    _firmwareVersion = FakeBleService.firmwareVersion;
-    _config = _ble.configFor(device, driverCode: _driver.code);
-    _rleSupported = _firmwareVersion! >= kMinRleFirmwareVersion;
-
-    addLog(LogLevel.success, '已连接 ${device.name}');
-    addLog(LogLevel.info, '固件版本 $firmwareVersionText，'
-        '驱动 id 0x${_driver.id.toUpperCase()}，引脚 $pinsText');
-    addLog(
-      LogLevel.info,
-      '固件通知：${_ble.textNotification(mtuValue: _mtu, rle: _rleSupported)}',
-    );
-    notifyListeners();
-  }
-
-  void disconnect() {
-    if (_connected == null) {
+  /// 完整连接流程，顺序与 web 版 `connect()` 一致：
+  /// 申请权限 → 建立连接 → 读固件版本 → 订阅通知 → 发 INIT（固件随后回配置/MTU 通知）。
+  Future<void> connect(EpdBleDevice device) async {
+    if (_isConnecting || isConnected) {
       return;
     }
-    final String name = _connected!.name;
+    _isConnecting = true;
+    notifyListeners();
+
+    final BlePermissionResult permission = await _ble.ensurePermissions();
+    addLog(
+      permission.granted ? LogLevel.success : LogLevel.error,
+      permission.message,
+    );
+    if (!permission.granted) {
+      _isConnecting = false;
+      notifyListeners();
+      return;
+    }
+
+    addLog(LogLevel.info, '正在连接 ${device.name} …');
+    notifyListeners();
+    try {
+      await _ble.connect(device.id);
+    } catch (error) {
+      addLog(LogLevel.error, '连接失败：$error');
+      _isConnecting = false;
+      notifyListeners();
+      return;
+    }
+
+    _connected = device;
+    _sawConfigNotification = false;
+    _firmwareVersion = await _ble.readFirmwareVersion();
+    _rleSupported =
+        _firmwareVersion != null && _firmwareVersion! >= kMinRleFirmwareVersion;
+    _notificationSubscription =
+        _ble.notifications.listen(_handleNotification);
+
+    addLog(LogLevel.success, '已连接 ${device.name}，固件版本 $firmwareVersionText');
+    addLog(
+      LogLevel.info,
+      '已订阅命令特征通知，自动发送 INIT 命令 …',
+    );
+    await _writeSilently(<EpdWrite>[
+      EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
+    ]);
+    _isConnecting = false;
+    notifyListeners();
+  }
+
+  Future<void> disconnect() async {
+    final EpdBleDevice? device = _connected;
+    if (device == null) {
+      return;
+    }
+    await _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+    await _ble.disconnect();
     _connected = null;
     _firmwareVersion = null;
     _config = null;
     _rleSupported = false;
-    addLog(LogLevel.warning, '已断开 $name');
+    _sawConfigNotification = false;
+    addLog(LogLevel.warning, '已断开 ${device.name}');
+    notifyListeners();
+  }
+
+  /// 处理固件通知：第一条按配置通知解析（7 引脚 + 驱动 id），其余按文本通知。
+  ///
+  /// 判定方式与 web 版一致：连接后的第一条通知就是配置通知。这里多一道保险 ——
+  /// 如果第一条看起来是纯 ASCII 文本（`mtu=…`），就按文本处理，避免把乱序通知当配置。
+  void _handleNotification(Uint8List value) {
+    if (!_sawConfigNotification && !_looksLikeText(value) && value.length >= 8) {
+      final EpdConfig config = parseConfigNotification(value);
+      _sawConfigNotification = true;
+      _config = config;
+      _recordNotification(
+        '配置通知：引脚 ${_hex(config.pins)}，驱动 0x'
+        '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}',
+      );
+      final EpdDriver? byCode = driverByCode(config.driver);
+      if (byCode != null && byCode.id != _driver.id) {
+        _driver = byCode;
+        _resampleSource();
+        addLog(
+          LogLevel.info,
+          '按固件上报的驱动同步为 ${byCode.label}',
+        );
+      } else {
+        addLog(LogLevel.info, '固件配置：引脚 $pinsText，驱动 id 0x'
+            '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}');
+      }
+      notifyListeners();
+      return;
+    }
+
+    final EpdTextNotification text = parseTextNotification(value);
+    _recordNotification('文本通知：${text.text}');
+    if (text.mtu != null) {
+      setMtu(text.mtu!);
+      addLog(LogLevel.info, '固件报告 MTU = ${text.mtu}');
+    }
+    if (text.rleSupported && !_rleSupported) {
+      _rleSupported = true;
+      addLog(LogLevel.success, '固件支持 RLE 压缩，已自动启用');
+    }
+    if (text.remoteUnixSeconds != null) {
+      final DateTime remote = DateTime.fromMillisecondsSinceEpoch(
+        text.remoteUnixSeconds! * 1000,
+      );
+      addLog(LogLevel.info, '设备时间：$remote');
+    }
+    if (text.mtu == null && !text.rleSupported && text.remoteUnixSeconds == null) {
+      addLog(LogLevel.info, '设备消息：${text.text}');
+    }
+    notifyListeners();
+  }
+
+  void _recordNotification(String entry) {
+    _notificationLog.add(entry);
+    if (_notificationLog.length > _maxNotificationLog) {
+      _notificationLog.removeRange(
+        0,
+        _notificationLog.length - _maxNotificationLog,
+      );
+    }
+  }
+
+  /// 刷新蓝牙子系统状态（诊断页用）。
+  Future<void> refreshDiagnostics() async {
+    _adapterStatusText = await _ble.describeAdapterStatus();
+    addLog(LogLevel.info, '蓝牙状态：$_adapterStatusText');
+    notifyListeners();
+  }
+
+  /// 主动申请一次运行权限（诊断页用）。
+  Future<void> requestBlePermission() async {
+    final BlePermissionResult result = await _ble.ensurePermissions();
+    addLog(
+      result.granted ? LogLevel.success : LogLevel.error,
+      result.message,
+    );
+    _adapterStatusText = await _ble.describeAdapterStatus();
+    notifyListeners();
+  }
+
+  /// 发一条 INIT 探测链路是否真的可写（诊断页用）。
+  Future<void> sendDiagnosticInit() async {
+    if (!_requireConnected('发送诊断命令')) {
+      return;
+    }
+    await _writeSilently(<EpdWrite>[
+      EpdWrite(payload: buildCommand(EpdCmd.init), withResponse: true),
+    ]);
+    addLog(LogLevel.success, '已发送 INIT（累计写入 $_writesSent 条）');
     notifyListeners();
   }
 
   // ============ 设备控制 ============
 
-  void syncTime({required bool clockMode}) {
+  Future<void> syncTime({required bool clockMode}) async {
     if (!_requireConnected('同步时间')) {
       return;
     }
@@ -265,6 +430,7 @@ class AppState extends ChangeNotifier {
       utcOffsetHours: now.timeZoneOffset.inHours,
       mode: clockMode ? EpdTimeMode.clock : EpdTimeMode.calendar,
     );
+    await _writeSilently(writes);
     addLog(
       LogLevel.success,
       '${clockMode ? '时钟' : '日历'}模式时间已下发：${_hex(writes.first.payload)}',
@@ -275,23 +441,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearScreen() => _sendSimple('清屏', planClearScreen());
+  Future<void> clearScreen() => _sendSimple('清屏', planClearScreen());
 
-  void refreshScreen() => _sendSimple('刷新', planRefresh());
+  Future<void> refreshScreen() => _sendSimple('刷新', planRefresh());
 
-  void sleepDevice() => _sendSimple('睡眠', planSleep());
+  Future<void> sleepDevice() => _sendSimple('睡眠', planSleep());
 
-  void _sendSimple(String label, List<EpdWrite> writes) {
+  Future<void> _sendSimple(String label, List<EpdWrite> writes) async {
     if (!_requireConnected(label)) {
       return;
     }
+    await _writeSilently(writes);
     addLog(LogLevel.success, '$label：${_hex(writes.first.payload)}');
     notifyListeners();
   }
 
-  /// 模拟把预览图发到设备。
-  ///
-  /// 真机上这里要按 [transferPlan] 逐条写特征值；现在只把统计打进日志。
+  /// 把当前预览图真正发到设备：按 [transferPlan] 逐条写特征值。
   Future<void> sendPreview() async {
     if (!_requireConnected('发送图片')) {
       return;
@@ -300,13 +465,37 @@ class AppState extends ChangeNotifier {
     addLog(LogLevel.info, '开始发送：${plan.totalWrites} 条写指令，'
         '${plan.processedBytes} 字节');
     notifyListeners();
-    await Future<void>.delayed(_sendDelay);
+
+    int sent = 0;
+    try {
+      for (final EpdWrite write in plan.writes) {
+        await _ble.write(write.payload, withResponse: write.withResponse);
+        sent++;
+        _writesSent++;
+      }
+    } catch (error) {
+      addLog(
+        LogLevel.error,
+        '发送中断（已发 $sent/${plan.totalWrites} 条）：$error',
+      );
+      notifyListeners();
+      return;
+    }
+
     addLog(
       LogLevel.success,
-      '发送完成（模拟）：${plan.imageWrites} 条图像写指令'
+      '发送完成：${plan.imageWrites} 条图像写指令'
       '${plan.usedRle ? '，已启用 RLE' : ''}',
     );
     notifyListeners();
+  }
+
+  /// 逐条写，不逐条打日志（避免一次传图刷几百条日志）。
+  Future<void> _writeSilently(List<EpdWrite> writes) async {
+    for (final EpdWrite write in writes) {
+      await _ble.write(write.payload, withResponse: write.withResponse);
+      _writesSent++;
+    }
   }
 
   // ============ 图像与参数 ============
@@ -434,6 +623,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
+  }
+
   // ============ 内部 ============
 
   bool _requireConnected(String action) {
@@ -448,5 +643,18 @@ class AppState extends ChangeNotifier {
     return bytes
         .map((int b) => b.toRadixString(16).toUpperCase().padLeft(2, '0'))
         .join(' ');
+  }
+
+  /// 判断一段通知是否看起来像可打印文本（固件文本通知都是 ASCII）。
+  bool _looksLikeText(Uint8List value) {
+    if (value.isEmpty) {
+      return false;
+    }
+    for (final int byte in value) {
+      if (byte < 0x20 || byte > 0x7E) {
+        return false;
+      }
+    }
+    return true;
   }
 }

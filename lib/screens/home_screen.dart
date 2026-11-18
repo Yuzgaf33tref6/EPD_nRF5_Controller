@@ -5,6 +5,7 @@ import '../widgets/log_panel.dart';
 import '../widgets/section_card.dart';
 import 'canvas_screen.dart';
 import 'connect_screen.dart';
+import 'diagnostics_screen.dart';
 import 'settings_screen.dart';
 
 /// 首页：连接状态 + 入口 + 设备控制 + 日志。
@@ -56,6 +57,12 @@ class HomeScreen extends StatelessWidget {
                         icon: const Icon(Icons.tune),
                         label: const Text('传输参数'),
                       ),
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            _open(context, const DiagnosticsScreen()),
+                        icon: const Icon(Icons.monitor_heart_outlined),
+                        label: const Text('蓝牙诊断'),
+                      ),
                     ],
                   ),
                 ),
@@ -79,15 +86,18 @@ class HomeScreen extends StatelessWidget {
                         child: const Text('同步时间（时钟）'),
                       ),
                       OutlinedButton(
-                        onPressed: connected ? state.clearScreen : null,
+                        onPressed:
+                            connected ? () => state.clearScreen() : null,
                         child: const Text('清屏'),
                       ),
                       OutlinedButton(
-                        onPressed: connected ? state.refreshScreen : null,
+                        onPressed:
+                            connected ? () => state.refreshScreen() : null,
                         child: const Text('刷新'),
                       ),
                       OutlinedButton(
-                        onPressed: connected ? state.sleepDevice : null,
+                        onPressed:
+                            connected ? () => state.sleepDevice() : null,
                         child: const Text('睡眠'),
                       ),
                     ],
@@ -138,12 +148,12 @@ class _ConnectionCard extends StatelessWidget {
           connected
               ? '固件 ${state.firmwareVersionText} · 驱动 0x${state.driver.id.toUpperCase()} · '
                   '${state.canvasSize.width}×${state.canvasSize.height} · MTU ${state.mtu}'
-              : '蓝牙层尚未接入，当前为模拟数据；进入「搜索并连接」可以体验完整流程',
+              : '还没有连接设备；先到「蓝牙诊断」确认权限与蓝牙状态，再去「搜索并连接」',
         ),
         isThreeLine: !connected,
         trailing: connected
             ? TextButton(
-                onPressed: state.disconnect,
+                onPressed: () => state.disconnect(),
                 child: const Text('断开'),
               )
             : null,

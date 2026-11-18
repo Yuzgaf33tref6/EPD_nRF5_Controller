@@ -155,7 +155,9 @@ class CanvasScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       FilledButton.icon(
                         onPressed:
-                            state.isConnected ? state.sendPreview : null,
+                            state.isConnected
+                                ? () => state.sendPreview()
+                                : null,
                         icon: const Icon(Icons.send),
                         label: const Text('发送到设备'),
                       ),

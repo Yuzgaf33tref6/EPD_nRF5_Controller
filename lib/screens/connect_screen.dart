@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../devices/epd_driver.dart';
-import '../services/fake_ble_service.dart';
+import '../services/ble_service.dart';
 import '../state/app_state.dart';
 import '../widgets/log_panel.dart';
 import '../widgets/section_card.dart';
 
-/// 连接页：扫描（模拟）→ 连接 → 显示固件上报的配置。
+/// 连接页：扫描 → 连接 → 显示固件上报的配置。
 class ConnectScreen extends StatelessWidget {
   const ConnectScreen({super.key});
 
@@ -35,14 +35,16 @@ class ConnectScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       const Text(
-                        '真实蓝牙尚未接入，这里的设备是固定的模拟数据，'
-                        '连接后会给出与真机一致的版本号、引脚与 MTU 通知。',
+                        '扫描使用系统 BLE（flutter_reactive_ble）。'
+                        '连接后会自动读固件版本、订阅通知并发 INIT 命令，'
+                        '固件随后上报引脚配置与 MTU/RLE 能力。',
                       ),
                       const SizedBox(height: 8),
                       FilledButton.icon(
-                        onPressed: state.isScanning ? null : state.scan,
+                        onPressed:
+                            state.isScanning ? null : () => state.scan(),
                         icon: const Icon(Icons.search),
-                        label: const Text('扫描附近设备'),
+                        label: Text(state.isScanning ? '扫描中 …' : '扫描附近设备'),
                       ),
                     ],
                   ),
@@ -54,7 +56,7 @@ class ConnectScreen extends StatelessWidget {
                       ? const Text('还没有扫描结果')
                       : Column(
                           children: state.devices
-                              .map((FakeEpdDevice device) => _DeviceTile(
+                              .map((EpdBleDevice device) => _DeviceTile(
                                     device: device,
                                     state: state,
                                   ))
@@ -79,7 +81,7 @@ class ConnectScreen extends StatelessWidget {
 class _DeviceTile extends StatelessWidget {
   const _DeviceTile({required this.device, required this.state});
 
-  final FakeEpdDevice device;
+  final EpdBleDevice device;
   final AppState state;
 
   @override
@@ -91,16 +93,17 @@ class _DeviceTile extends StatelessWidget {
         isCurrent ? Icons.bluetooth_connected : Icons.bluetooth,
         color: isCurrent ? Theme.of(context).colorScheme.primary : null,
       ),
-      title: Text(device.name),
+      title: Text(device.name.isEmpty ? '(无广播名)' : device.name),
       subtitle: Text('${device.id} · ${device.rssi} dBm'),
       trailing: isCurrent
           ? TextButton(
-              onPressed: state.disconnect,
+              onPressed: () => state.disconnect(),
               child: const Text('断开'),
             )
           : TextButton(
-              onPressed: () => state.connect(device),
-              child: const Text('连接'),
+              onPressed:
+                  state.isConnecting ? null : () => state.connect(device),
+              child: Text(state.isConnecting ? '连接中 …' : '连接'),
             ),
     );
   }

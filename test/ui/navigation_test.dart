@@ -64,8 +64,33 @@ void main() {
     expect(find.text('EPD Controller'), findsOneWidget);
   });
 
+  testWidgets('首页 → 蓝牙诊断 → 返回', (WidgetTester tester) async {
+    await tester.pumpWidget(const EpdControllerApp());
+
+    await tester.scrollUntilVisible(
+      find.text('蓝牙诊断'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('蓝牙诊断'));
+    await tester.pumpAndSettle();
+    expect(find.text('蓝牙诊断'), findsWidgets);
+    expect(find.text('链路状态'), findsOneWidget);
+    expect(find.textContaining('还没有收到通知'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('EPD Controller'), findsOneWidget);
+  });
+
   testWidgets('未连接时设备控制按钮禁用', (WidgetTester tester) async {
     await tester.pumpWidget(const EpdControllerApp());
+
+    await tester.scrollUntilVisible(
+      find.text('清屏'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     final OutlinedButton clearButton = tester.widget<OutlinedButton>(
       find.widgetWithText(OutlinedButton, '清屏'),
     );

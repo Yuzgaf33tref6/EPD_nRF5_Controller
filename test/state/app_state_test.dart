@@ -5,15 +5,25 @@ import 'package:epd_controller/devices/epd_driver.dart';
 import 'package:epd_controller/image/dither.dart';
 import 'package:epd_controller/protocol/epd_protocol.dart';
 import 'package:epd_controller/protocol/transfer.dart';
+import 'package:epd_controller/services/ble_service.dart';
 import 'package:epd_controller/services/fake_ble_service.dart';
 import 'package:epd_controller/state/app_state.dart';
 
 /// 这些测试里所有延时都设成 0，避免真等。
-AppState buildState() => AppState(
+FakeBleService buildFake({bool grantPermission = true}) => FakeBleService(
       scanDelay: Duration.zero,
       connectDelay: Duration.zero,
-      sendDelay: Duration.zero,
+      grantPermission: grantPermission,
     );
+
+AppState buildState({FakeBleService? ble}) => AppState(
+      bleService: ble ?? buildFake(),
+      scanDelay: Duration.zero,
+      connectDelay: Duration.zero,
+    );
+
+/// 广播流的通知是异步派发的，等一个微任务让通知处理函数跑完。
+Future<void> settle() => Future<void>.delayed(Duration.zero);
 
 void main() {
   group('初始状态', () {
@@ -40,14 +50,15 @@ void main() {
   });
 
   group('扫描与连接', () {
-    test('扫描返回模拟设备，连接后拿到固件版本与引脚', () async {
+    test('扫描返回设备，连接后拿到固件版本与引脚', () async {
       final AppState state = buildState();
       await state.scan();
       expect(state.isScanning, isFalse);
       expect(state.devices, isNotEmpty);
 
-      final FakeEpdDevice device = state.devices.first;
+      final EpdBleDevice device = state.devices.first;
       await state.connect(device);
+      await settle();
       expect(state.isConnected, isTrue);
       expect(state.connectedDevice!.id, device.id);
       expect(state.firmwareVersion, FakeBleService.firmwareVersion);
@@ -56,25 +67,57 @@ void main() {
       expect(state.rleSupported, isTrue);
       expect(state.pinsText.split(' ').length, 7);
       expect(state.config, isNotNull);
+      // 连接流程里自动发了一条 INIT。
+      expect(state.writesSent, 1);
+    });
+
+    test('连接后自动发 INIT，固件回配置通知与 MTU 文本通知', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+
+      expect(ble.writtenPayloads, hasLength(1));
+      expect(ble.writtenPayloads.first.first, EpdCmd.init.code);
+      expect(state.notificationLog, hasLength(2));
+      expect(state.notificationLog.first, contains('配置通知'));
+      expect(state.notificationLog.last, contains('mtu=20'));
+      expect(state.mtu, FakeBleService.mtu);
     });
 
     test('断开后清空固件与配置', () async {
       final AppState state = buildState();
       await state.scan();
       await state.connect(state.devices.first);
-      state.disconnect();
+      await settle();
+      await state.disconnect();
       expect(state.isConnected, isFalse);
       expect(state.firmwareVersion, isNull);
       expect(state.config, isNull);
       expect(state.rleSupported, isFalse);
     });
 
+    test('权限被拒绝时不会去连接，并记一条错误日志', () async {
+      final FakeBleService ble = buildFake(grantPermission: false);
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      expect(state.isConnected, isFalse);
+      expect(state.isConnecting, isFalse);
+      expect(ble.writtenPayloads, isEmpty);
+      expect(
+        state.logs.map((LogEntry entry) => entry.level),
+        contains(LogLevel.error),
+      );
+    });
+
     test('未连接时发送与设备控制只记警告，不抛异常', () async {
       final AppState state = buildState();
       final int before = state.logs.length;
       await state.sendPreview();
-      state.clearScreen();
-      state.syncTime(clockMode: false);
+      await state.clearScreen();
+      await state.syncTime(clockMode: false);
       expect(state.isConnected, isFalse);
       expect(state.logs.length, greaterThan(before));
       expect(
@@ -83,14 +126,27 @@ void main() {
       );
     });
 
-    test('已连接时可以发送与同步时间', () async {
-      final AppState state = buildState();
+    test('已连接时可以发送与同步时间，写指令真的发出去了', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
       await state.scan();
       await state.connect(state.devices.first);
+      await settle();
+
+      final int afterConnect = ble.writtenPayloads.length;
       await state.sendPreview();
-      state.syncTime(clockMode: false);
-      state.clearScreen();
-      expect(state.isConnected, isTrue);
+      await state.syncTime(clockMode: false);
+      await state.clearScreen();
+
+      final ImageTransferPlan plan = state.transferPlan;
+      expect(ble.writtenPayloads.length,
+          afterConnect + plan.totalWrites + 1 + 1);
+      // 传图的第一条是 INIT，最后一条是 REFRESH。
+      expect(ble.writtenPayloads[afterConnect].first, EpdCmd.init.code);
+      expect(
+        ble.writtenPayloads[afterConnect + plan.totalWrites - 1].first,
+        EpdCmd.refresh.code,
+      );
       expect(
         state.logs.map((LogEntry entry) => entry.message).join('\n'),
         contains('发送完成'),
@@ -144,11 +200,12 @@ void main() {
       state.setRleSupported(true);
       final ImageTransferPlan compressed = state.transferPlan;
       expect(compressed.totalWrites, greaterThan(0));
-      // 抖动后的位打包数据run 很短，压缩经常没有收益；有收益时才必须更小。
+      // 抖动后的位打包数据 run 很短，压缩经常没有收益；有收益时才必须更小。
       if (compressed.usedRle) {
         expect(_transmittedBytes(compressed), lessThan(plainBytes));
       }
     });
+
     test('抖动算法变化会改变预览图内容', () {
       final AppState state = buildState();
       final List<int> floyd =
