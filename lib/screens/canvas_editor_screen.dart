@@ -136,111 +136,20 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
   }
 
   Future<void> _showTextDialog() async {
-    final TextEditingController controller = TextEditingController();
-    double fontSize = 28;
-    int colorIndex = _colorIndex;
-    final bool? confirmed = await showDialog<bool>(
+    final _TextSpec? spec = await showDialog<_TextSpec>(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (
-            BuildContext context,
-            void Function(void Function()) setDialogState,
-          ) {
-            return AlertDialog(
-              title: const Text('添加文字'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      maxLines: 3,
-                      minLines: 1,
-                      decoration: const InputDecoration(
-                        labelText: '文字内容',
-                        hintText: '输入要写进画布的字',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: <Widget>[
-                        const SizedBox(width: 48, child: Text('字号')),
-                        Expanded(
-                          child: Slider(
-                            value: fontSize,
-                            min: 12,
-                            max: 96,
-                            divisions: 21,
-                            label: fontSize.toStringAsFixed(0),
-                            onChanged: (double value) => setDialogState(
-                              () => fontSize = value,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 32,
-                          child: Text(
-                            fontSize.toStringAsFixed(0),
-                            textAlign: TextAlign.end,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        for (int i = 0; i < kBrushColors.length; i++)
-                          _ColorChip(
-                            color: kBrushColors[i],
-                            selected: i == colorIndex,
-                            onPressed: () =>
-                                setDialogState(() => colorIndex = i),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (controller.text.trim().isEmpty) {
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop(true);
-                  },
-                  child: const Text('确定'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (BuildContext dialogContext) =>
+          _TextInputDialog(initialColorIndex: _colorIndex),
     );
-
-    final String text = controller.text.trim();
-    controller.dispose();
-    if (confirmed != true || text.isEmpty) {
+    if (spec == null || spec.text.isEmpty) {
       return;
     }
     setState(() {
       _pendingText = _TextPending(
-        text: text,
-        fontSize: fontSize,
-        colorIndex: colorIndex,
-        position: Offset(
-          (_working.width - text.length * fontSize * 0.5) / 2,
-          (_working.height - fontSize * 1.2) / 2,
-        ),
+        text: spec.text,
+        fontSize: spec.fontSize,
+        colorIndex: spec.colorIndex,
+        position: Offset(_working.width * 0.1, _working.height * 0.42),
       );
     });
   }
@@ -672,4 +581,121 @@ class _TextGhostPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TextGhostPainter oldDelegate) => true;
+}
+
+/// 文字对话框的返回值。
+class _TextSpec {
+  _TextSpec({
+    required this.text,
+    required this.fontSize,
+    required this.colorIndex,
+  });
+
+  final String text;
+  final double fontSize;
+  final int colorIndex;
+}
+
+/// 文字输入对话框。
+///
+/// 自己持有 TextEditingController：如果放在调用方再 dispose，对话框退场动画期间
+/// TextField 还在重建，会撞上「A TextEditingController was used after being disposed」。
+class _TextInputDialog extends StatefulWidget {
+  const _TextInputDialog({required this.initialColorIndex});
+
+  final int initialColorIndex;
+
+  @override
+  State<_TextInputDialog> createState() => _TextInputDialogState();
+}
+
+class _TextInputDialogState extends State<_TextInputDialog> {
+  final TextEditingController _controller = TextEditingController();
+  double _fontSize = 28;
+  late int _colorIndex = widget.initialColorIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String text = _controller.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    Navigator.of(context).pop(
+      _TextSpec(text: text, fontSize: _fontSize, colorIndex: _colorIndex),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加文字'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLines: 3,
+              minLines: 1,
+              decoration: const InputDecoration(
+                labelText: '文字内容',
+                hintText: '输入要写进画布的字',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                const SizedBox(width: 48, child: Text('字号')),
+                Expanded(
+                  child: Slider(
+                    value: _fontSize,
+                    min: 12,
+                    max: 96,
+                    divisions: 21,
+                    label: _fontSize.toStringAsFixed(0),
+                    onChanged: (double value) =>
+                        setState(() => _fontSize = value),
+                  ),
+                ),
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    _fontSize.toStringAsFixed(0),
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (int i = 0; i < kBrushColors.length; i++)
+                  _ColorChip(
+                    color: kBrushColors[i],
+                    selected: i == _colorIndex,
+                    onPressed: () => setState(() => _colorIndex = i),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
+      ],
+    );
+  }
 }
