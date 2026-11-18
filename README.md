@@ -42,13 +42,14 @@ EPD-nRF5 墨水屏的 **Android 客户端**（Flutter）。把原项目
 
 ## 下载与安装
 
-到 [Releases](../../releases) 下载最新的 `app-*-release.apk`：
+到 [Releases](../../releases) 下载最新的安装包，文件名格式为
+`EPDController-<版本号>-<ABI>.apk`：
 
 | 文件 | 适用 |
 | --- | --- |
-| `app-arm64-v8a-release.apk` | 绝大多数手机（推荐） |
-| `app-armeabi-v7a-release.apk` | 较老的 32 位设备 |
-| `app-x86_64-release.apk` | 模拟器 |
+| `EPDController-0.1.0-arm64-v8a.apk` | 绝大多数手机（推荐） |
+| `EPDController-0.1.0-armeabi-v7a.apk` | 较老的 32 位设备 |
+| `EPDController-0.1.0-x86_64.apk` | 模拟器 |
 
 发布页同时给出每个文件的 SHA-256（也在 `SHA256SUMS.txt` 里），可自行校验。
 
