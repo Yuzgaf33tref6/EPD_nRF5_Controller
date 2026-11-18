@@ -25,6 +25,12 @@ dependencies:
   permission_handler: 12.0.3
   permission_handler_android: 13.0.1
 
+  # 选图（画布导入图片）。同样钉版本：image_picker 1.2.4 会拉
+  # image_picker_android ^0.8.13，而 0.8.13+25 的原生层要求 AGP 8.13.1 / Kotlin 2.3.20，
+  # 本项目是 AGP 8.11.1 / Kotlin 2.2.20；0.8.13+1 用 AGP 8.12.1 / minSdk 21，跨度最小。
+  image_picker: 1.2.4
+  image_picker_android: 0.8.13+1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
