@@ -20,3 +20,9 @@
 # com.google.android.play:core 依赖。R8 检查到这些「被引用但不存在的类」会直接
 # 报 Missing class 并中断构建，所以显式关掉对这些类的警告。
 -dontwarn com.google.android.play.core.**
+
+# flutter_reactive_ble 的原生实现在 com.signify.hue.* 下，内部依赖反射与
+# RxAndroidBle 的回调；插件自带 consumerProguardFiles 已包含同样的规则，
+# 这里再写一次做保险（consumer 规则在依赖打包异常时会失效）。
+-keep class com.signify.hue.** { *; }
+-dontwarn com.signify.hue.**

@@ -10,6 +10,21 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # BLE 传输层。Dart 层 API 5.5.0 与 5.6.0 完全一致，但 5.6.0 的原生实现要求
+  # compileSdk 37 / AGP 9.1 / Kotlin 2.4.10，对比本项目（Flutter 3.44.9 自带
+  # compileSdk 36、AGP 8.11.1、Kotlin 2.2.20）跨度过大，故钉在 5.5.0
+  # （原生层 compileSdk 33 / AGP 8.0.2 / Kotlin 1.8.21）。
+  flutter_reactive_ble: 5.5.0
+  # 显式声明原生实现，避免 ^5.5.0 把 reactive_ble_mobile 解析到 5.6.0。
+  reactive_ble_mobile: 5.5.0
+
+  # 运行时权限。flutter_reactive_ble 的原生层不做任何权限申请，
+  # Android 12+ 必须由 App 自己申请 BLUETOOTH_SCAN / BLUETOOTH_CONNECT。
+  # 同理钉版本：permission_handler 13 会拉 permission_handler_android 14，
+  # 后者要求 compileSdk 37 / Kotlin 2.3.20；12.0.3 拉的是 13.x（compileSdk 35）。
+  permission_handler: 12.0.3
+  permission_handler_android: 13.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
