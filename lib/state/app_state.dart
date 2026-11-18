@@ -69,7 +69,6 @@ class AppState extends ChangeNotifier {
     Duration scanDelay = const Duration(milliseconds: 700),
     Duration connectDelay = const Duration(milliseconds: 450),
   })  : _scanDelay = scanDelay,
-        _connectDelay = connectDelay,
         _ble = bleService ??
             FakeBleService(scanDelay: scanDelay, connectDelay: connectDelay) {
     _sourceImage =
@@ -84,7 +83,6 @@ class AppState extends ChangeNotifier {
 
   final EpdBleService _ble;
   final Duration _scanDelay;
-  final Duration _connectDelay;
 
   /// 目标设备是 4.2 寸三色（驱动 0x03），所以默认选它而不是 web 版的第一项。
   static final EpdDriver _defaultDriver = driverById('03') ?? kEpdDrivers.first;
