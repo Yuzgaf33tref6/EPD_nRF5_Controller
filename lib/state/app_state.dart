@@ -27,6 +27,7 @@ import '../image/sample_image.dart';
 import '../protocol/epd_protocol.dart';
 import '../protocol/transfer.dart';
 import '../services/ble_service.dart';
+import '../services/image_pick_service.dart';
 import '../services/fake_ble_service.dart';
 
 /// 日志级别，决定日志面板里的颜色。
@@ -67,9 +68,11 @@ class AppStateScope extends InheritedNotifier<AppState> {
 class AppState extends ChangeNotifier {
   AppState({
     EpdBleService? bleService,
+    ImagePickService? imagePickService,
     Duration scanDelay = const Duration(milliseconds: 700),
     Duration connectDelay = const Duration(milliseconds: 450),
   })  : _scanDelay = scanDelay,
+        _imagePick = imagePickService ?? GalleryImagePickService(),
         _ble = bleService ??
             FakeBleService(scanDelay: scanDelay, connectDelay: connectDelay) {
     _sourceImage =
@@ -84,6 +87,8 @@ class AppState extends ChangeNotifier {
 
   final EpdBleService _ble;
   final Duration _scanDelay;
+
+  final ImagePickService _imagePick;
 
   /// 目标设备是 4.2 寸三色（驱动 0x03），所以默认选它而不是 web 版的第一项。
   static final EpdDriver _defaultDriver = driverById('03') ?? kEpdDrivers.first;
@@ -661,6 +666,17 @@ class AppState extends ChangeNotifier {
     _sourceImage = image;
     _invalidatePreview();
     notifyListeners();
+  }
+
+  /// 从相册选一张图（只负责选与解码，裁剪在 UI 层做）。取消返回 null。
+  Future<RgbaImage?> pickImageFromGallery() async {
+    final RgbaImage? image = await _imagePick.pickFromGallery();
+    if (image == null) {
+      addLog(LogLevel.info, '已取消选图');
+      return null;
+    }
+    addLog(LogLevel.success, '已选择图片 ${image.width}×${image.height}');
+    return image;
   }
 
   /// 直接换掉底图（导入图片用），并把历史重置到这张图。

@@ -132,4 +132,16 @@ void main() {
     );
     expect(clearButton.onPressed, isNull);
   });
+  testWidgets('画布页有导入图片入口', (WidgetTester tester) async {
+    await tester.pumpWidget(const EpdControllerApp());
+    await tester.tap(find.text('编辑并发送'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('导入图片'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('导入图片'), findsOneWidget);
+  });
 }

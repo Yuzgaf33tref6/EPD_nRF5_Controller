@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +11,7 @@ import 'package:epd_controller/protocol/epd_protocol.dart';
 import 'package:epd_controller/protocol/transfer.dart';
 import 'package:epd_controller/services/ble_service.dart';
 import 'package:epd_controller/services/fake_ble_service.dart';
+import 'package:epd_controller/services/image_pick_service.dart';
 import 'package:epd_controller/state/app_state.dart';
 
 /// 这些测试里所有延时都设成 0，避免真等。
@@ -18,11 +21,26 @@ FakeBleService buildFake({bool grantPermission = true}) => FakeBleService(
       grantPermission: grantPermission,
     );
 
-AppState buildState({FakeBleService? ble}) => AppState(
+AppState buildState({FakeBleService? ble, ImagePickService? picker}) => AppState(
       bleService: ble ?? buildFake(),
+      imagePickService: picker,
       scanDelay: Duration.zero,
       connectDelay: Duration.zero,
     );
+
+/// 固定返回一张图的选图服务，用来避免测试碰真实相册。
+class FakePickService implements ImagePickService {
+  FakePickService({this.result});
+
+  RgbaImage? result;
+  int calls = 0;
+
+  @override
+  Future<RgbaImage?> pickFromGallery() async {
+    calls++;
+    return result;
+  }
+}
 
 /// 广播流的通知是异步派发的，等一个微任务让通知处理函数跑完。
 Future<void> settle() => Future<void>.delayed(Duration.zero);
@@ -267,6 +285,51 @@ void main() {
     });
   });
 
+
+  group('导入图片', () {
+    test('选到图时返回图片并记一条成功日志', () async {
+      final FakePickService picker = FakePickService();
+      final RgbaImage picked = RgbaImage(
+        3,
+        2,
+        Uint8List.fromList(List<int>.generate(3 * 2 * 4, (int i) => 255)),
+      );
+      picker.result = picked;
+      final AppState state = buildState(picker: picker);
+      final RgbaImage? result = await state.pickImageFromGallery();
+      expect(picker.calls, 1);
+      expect(identical(result, picked), isTrue);
+      expect(
+        state.logs.any((LogEntry entry) => entry.message.contains('已选择图片')),
+        isTrue,
+      );
+    });
+
+    test('取消选图返回 null 并记一条提示', () async {
+      final FakePickService picker = FakePickService();
+      final AppState state = buildState(picker: picker);
+      final RgbaImage? result = await state.pickImageFromGallery();
+      expect(result, isNull);
+      expect(
+        state.logs.any((LogEntry entry) => entry.message.contains('已取消选图')),
+        isTrue,
+      );
+    });
+
+    test('replaceSource 换成新图后预览尺寸跟着变', () {
+      final AppState state = buildState();
+      final RgbaImage replacement = RgbaImage(
+        120,
+        90,
+        Uint8List.fromList(List<int>.generate(120 * 90 * 4, (int i) => 200)),
+      );
+      state.replaceSource(replacement);
+      expect(state.sourceImage.width, 120);
+      expect(state.sourceImage.height, 90);
+      expect(state.previewImage.width, 120);
+      expect(state.previewImage.height, 90);
+    });
+  });
   group('主题与日志', () {
     test('主题可切换', () {
       final AppState state = buildState();

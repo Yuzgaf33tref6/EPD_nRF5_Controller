@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../devices/epd_driver.dart';
 import '../image/dither.dart';
+import '../image/rgba_image.dart';
 import '../state/app_state.dart';
 import '../widgets/image_preview.dart';
 import '../widgets/log_panel.dart';
 import '../widgets/section_card.dart';
 import 'canvas_editor_screen.dart';
+import 'crop_screen.dart';
 
 /// 画布页：预览抖动结果 + 调抖动参数 + 看真实传图统计 + 发送。
 ///
@@ -60,6 +62,31 @@ class _CanvasScreenState extends State<CanvasScreen> {
     _contrastTimer?.cancel();
     setState(() => _pendingContrast = null);
     state.setContrast(value);
+  }
+
+  /// 选图 → 裁剪 → 换成底图。
+  Future<void> _importImage(AppState state) async {
+    final RgbaImage? picked = await state.pickImageFromGallery();
+    if (picked == null || !mounted) {
+      return;
+    }
+    final RgbaImage? cropped = await Navigator.of(context).push<RgbaImage>(
+      MaterialPageRoute<RgbaImage>(
+        builder: (BuildContext context) => CropScreen(
+          source: picked,
+          canvasWidth: state.canvasSize.width,
+          canvasHeight: state.canvasSize.height,
+        ),
+      ),
+    );
+    if (cropped == null || !mounted) {
+      return;
+    }
+    state.replaceSource(cropped);
+    state.addLog(
+      LogLevel.success,
+      '已导入图片并裁剪到 ${cropped.width}×${cropped.height}',
+    );
   }
 
   @override
@@ -188,6 +215,11 @@ class _CanvasScreenState extends State<CanvasScreen> {
                             onPressed: state.rotateSource,
                             icon: const Icon(Icons.rotate_90_degrees_cw),
                             label: const Text('旋转 90°'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _importImage(state),
+                            icon: const Icon(Icons.add_photo_alternate_outlined),
+                            label: const Text('导入图片'),
                           ),
                           OutlinedButton.icon(
                             onPressed: state.resetSource,
