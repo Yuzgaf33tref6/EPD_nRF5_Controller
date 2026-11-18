@@ -131,6 +131,8 @@ ImageTransferPlan planImageTransfer({
   required bool rleSupported,
   int interleavedCount = 50,
   bool alwaysWithResponse = false,
+  bool swapPlanes = false,
+  bool invertRedPlane = false,
 }) {
   final warnings = <TransferWarning>[
     if (canvasSizeName != driver.canvasSizeName) TransferWarning.canvasSizeMismatch,
@@ -165,8 +167,21 @@ ImageTransferPlan planImageTransfer({
   if (colorMode == EpdColorMode.threeColor) {
     // web 版用 Math.floor，两个位平面等长，这里 ~/ 与之等价。
     final int halfLength = processed.length ~/ 2;
-    final Uint8List blackWhiteData = Uint8List.sublistView(processed, 0, halfLength);
-    final Uint8List redWhiteData = Uint8List.sublistView(processed, halfLength);
+    Uint8List blackWhiteData = Uint8List.sublistView(processed, 0, halfLength);
+    Uint8List redWhiteData = Uint8List.sublistView(processed, halfLength);
+    // 真机上排查「颜色不对」用的两个开关，默认都关（默认行为与 web 版逐字节一致）。
+    if (invertRedPlane) {
+      final Uint8List inverted = Uint8List(redWhiteData.length);
+      for (int i = 0; i < redWhiteData.length; i++) {
+        inverted[i] = 0xFF ^ redWhiteData[i];
+      }
+      redWhiteData = inverted;
+    }
+    if (swapPlanes) {
+      final Uint8List tmp = blackWhiteData;
+      blackWhiteData = redWhiteData;
+      redWhiteData = tmp;
+    }
     if (uc8159) {
       writePlane(convertUC8159(blackWhiteData, redWhiteData), ImagePlane.black);
     } else {

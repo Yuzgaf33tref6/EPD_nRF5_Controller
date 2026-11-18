@@ -149,8 +149,9 @@ void main() {
       expect(sent.length, greaterThan(2));
       expect(sent.first.first, EpdCmd.init.code);
       expect(sent.last.first, EpdCmd.refresh.code);
-      // 纯色图经过 RLE 后每个平面只剩极少几条，所以条数远小于满图的 1667 条。
-      expect(sent.length, lessThan(20));
+      // 纯色图 RLE 后每个平面约 116 个 run code（15000/130），稳妥档每块只装
+      // 8 个 code（16 字节 ≤ 18），所以两个平面合计约 30 条，远少于满图的 1667 条。
+      expect(sent.length, lessThan(60));
     });
 
     test('意外断开时把连接状态清掉并记错误日志', () async {

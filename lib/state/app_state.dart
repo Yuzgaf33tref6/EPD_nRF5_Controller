@@ -130,6 +130,12 @@ class AppState extends ChangeNotifier {
   /// 分块档位：稳妥（18，与 web 版默认一致）/ 快速（64）/ 极限（180）/ 自定义。
   TransferSpeed _speed = TransferSpeed.conservative;
 
+  /// 排查开关：调换黑白/红白两个显存平面。
+  bool _swapPlanes = false;
+
+  /// 排查开关：红白平面整体取反。
+  bool _invertRedPlane = false;
+
   /// 单条图像写指令最多带多少字节有效负载。见 [writeChunkBytes] 的说明。
   static const int kMaxChunkDataBytes = 180;
 
@@ -289,7 +295,8 @@ class AppState extends ChangeNotifier {
   ImageTransferPlan get transferPlan {
     final RgbaImage image = previewImage;
     final Object key = Object.hash(image, _driver.id, canvasSize.name, colorMode,
-        _mtu, _rleSupported, _interleavedCount, _speed);
+        _mtu, _rleSupported, _interleavedCount, _speed, _swapPlanes,
+        _invertRedPlane);
     final ImageTransferPlan? cached = _planCache;
     if (cached != null && _planCacheKey == key) {
       return cached;
@@ -305,10 +312,38 @@ class AppState extends ChangeNotifier {
       // 真机上必须一条一条等确认：连续几十条无响应写会撑爆蓝牙缓冲，
       // Android 回 GATT 133 并直接拆连接（这就是「命令发不完 + 假连接」的根因）。
       alwaysWithResponse: true,
+      swapPlanes: _swapPlanes,
+      invertRedPlane: _invertRedPlane,
     );
     _planCache = plan;
     _planCacheKey = key;
     return plan;
+  }
+
+  /// 排查开关：把黑白平面与红白平面调换（有些面板把两片显存的含义弄反了）。
+  bool get swapPlanes => _swapPlanes;
+
+  void setSwapPlanes(bool value) {
+    if (_swapPlanes == value) {
+      return;
+    }
+    _swapPlanes = value;
+    addLog(LogLevel.info, '平面调换：${value ? '已开启' : '已关闭'}');
+    _invalidatePreview();
+    notifyListeners();
+  }
+
+  /// 排查开关：把红白平面整体取反（有些面板 0 表示红、1 表示白，与 web 版相反）。
+  bool get invertRedPlane => _invertRedPlane;
+
+  void setInvertRedPlane(bool value) {
+    if (_invertRedPlane == value) {
+      return;
+    }
+    _invertRedPlane = value;
+    addLog(LogLevel.info, '红平面取反：${value ? '已开启' : '已关闭'}');
+    _invalidatePreview();
+    notifyListeners();
   }
 
   /// 传图统计，一行文字。
@@ -738,6 +773,8 @@ class AppState extends ChangeNotifier {
       rleSupported: _rleSupported,
       interleavedCount: _interleavedCount,
       alwaysWithResponse: true,
+      swapPlanes: _swapPlanes,
+      invertRedPlane: _invertRedPlane,
     );
     addLog(
       LogLevel.info,

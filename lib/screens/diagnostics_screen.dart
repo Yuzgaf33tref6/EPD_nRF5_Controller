@@ -140,6 +140,29 @@ class DiagnosticsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 SectionCard(
+                  title: '平面排查开关',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('调换黑白 / 红白平面'),
+                        subtitle: const Text('两片显存含义被面板搞反时打开'),
+                        value: state.swapPlanes,
+                        onChanged: state.setSwapPlanes,
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('红白平面取反'),
+                        subtitle: const Text('红的出现白的、白的出现红的时候打开'),
+                        value: state.invertRedPlane,
+                        onChanged: state.setInvertRedPlane,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SectionCard(
                   title: '收到的通知（最新在上）',
                   child: state.notificationLog.isEmpty
                       ? const Text('还没有收到通知；连接设备并发 INIT 后再看这里')

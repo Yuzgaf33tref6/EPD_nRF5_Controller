@@ -152,6 +152,63 @@ void main() {
     });
   });
 
+  group('平面排查开关', () {
+    // 32×8 的小图：三色模式下两个位平面各 32 字节（4 字节/行 × 8 行）。
+    RgbaImage buildImage() {
+      final RgbaImage image = RgbaImage(32, 8);
+      for (int i = 0; i < 32 * 8; i++) {
+        final int offset = i * 4;
+        image.data[offset] = 220; // 纯红：黑白平面判黑、红白平面判红（都是 0 位）
+        image.data[offset + 3] = 255;
+      }
+      return image;
+    }
+
+    ImageTransferPlan plan({bool swap = false, bool invert = false}) {
+      return planImageTransfer(
+        image: buildImage(),
+        driver: driverById('03')!,
+        colorMode: EpdColorMode.threeColor,
+        canvasSizeName: '4.2_400_300',
+        mtu: 20,
+        rleSupported: false,
+        swapPlanes: swap,
+        invertRedPlane: invert,
+      );
+    }
+
+    /// payload = [0x30, flag, ...data]，这里只比数据段。
+    List<int> dataOf(EpdWrite write) => write.payload.sublist(2);
+
+    test('默认不变；打开取反后红白平面的每个数据字节都翻过来', () {
+      final ImageTransferPlan normal = plan();
+      final ImageTransferPlan inverted = plan(invert: true);
+      expect(inverted.imageWrites, normal.imageWrites);
+      final int half = normal.imageWrites ~/ 2;
+      for (int i = 0; i < half; i++) {
+        // 黑白平面不受影响。
+        expect(dataOf(inverted.writes[1 + i]), dataOf(normal.writes[1 + i]));
+        // 红白平面整体取反。
+        final List<int> a = dataOf(normal.writes[1 + half + i]);
+        final List<int> b = dataOf(inverted.writes[1 + half + i]);
+        expect(b.length, a.length);
+        for (int j = 0; j < a.length; j++) {
+          expect(b[j], 0xFF ^ a[j]);
+        }
+      }
+    });
+
+    test('调换平面后两段数据互换', () {
+      final ImageTransferPlan normal = plan();
+      final ImageTransferPlan swapped = plan(swap: true);
+      final int half = normal.imageWrites ~/ 2;
+      for (int i = 0; i < half; i++) {
+        expect(dataOf(swapped.writes[1 + i]), dataOf(normal.writes[1 + half + i]));
+        expect(dataOf(swapped.writes[1 + half + i]), dataOf(normal.writes[1 + i]));
+      }
+    });
+  });
+
   group('参数校验与兼容性提示', () {
     test('mtu 小于 3 抛参数错误（web 版会死循环）', () {
       final RgbaImage image = RgbaImage(8, 8);
