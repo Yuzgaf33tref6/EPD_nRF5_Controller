@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../image/canvas_editing.dart';
 import '../image/epd_color.dart';
 import '../image/rgba_image.dart';
+import '../image/text_stamp.dart';
 import '../state/app_state.dart';
 import '../widgets/image_preview.dart';
 import '../widgets/section_card.dart';
@@ -28,6 +29,10 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
   bool _erasing = false;
   int _colorIndex = 0;
   double _radius = 4;
+
+  /// 正在定位、还没落盘的文字块。
+  _TextPending? _pendingText;
+  Offset _lastLocalPosition = Offset.zero;
 
   /// 正在画的一笔（图片坐标系）。
   final List<Offset> _strokePoints = <Offset>[];
@@ -130,6 +135,146 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
     AppStateScope.of(context).commitEdit(_working.clone());
   }
 
+  Future<void> _showTextDialog() async {
+    final TextEditingController controller = TextEditingController();
+    double fontSize = 28;
+    int colorIndex = _colorIndex;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (
+            BuildContext context,
+            void Function(void Function()) setDialogState,
+          ) {
+            return AlertDialog(
+              title: const Text('添加文字'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      maxLines: 3,
+                      minLines: 1,
+                      decoration: const InputDecoration(
+                        labelText: '文字内容',
+                        hintText: '输入要写进画布的字',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        const SizedBox(width: 48, child: Text('字号')),
+                        Expanded(
+                          child: Slider(
+                            value: fontSize,
+                            min: 12,
+                            max: 96,
+                            divisions: 21,
+                            label: fontSize.toStringAsFixed(0),
+                            onChanged: (double value) => setDialogState(
+                              () => fontSize = value,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 32,
+                          child: Text(
+                            fontSize.toStringAsFixed(0),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        for (int i = 0; i < kBrushColors.length; i++)
+                          _ColorChip(
+                            color: kBrushColors[i],
+                            selected: i == colorIndex,
+                            onPressed: () =>
+                                setDialogState(() => colorIndex = i),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) {
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final String text = controller.text.trim();
+    controller.dispose();
+    if (confirmed != true || text.isEmpty) {
+      return;
+    }
+    setState(() {
+      _pendingText = _TextPending(
+        text: text,
+        fontSize: fontSize,
+        colorIndex: colorIndex,
+        position: Offset(
+          (_working.width - text.length * fontSize * 0.5) / 2,
+          (_working.height - fontSize * 1.2) / 2,
+        ),
+      );
+    });
+  }
+
+  Future<void> _placeText() async {
+    final _TextPending? pending = _pendingText;
+    if (pending == null) {
+      return;
+    }
+    final BrushColor color = kBrushColors[pending.colorIndex];
+    final RgbaImage stamp = await renderText(
+      text: pending.text,
+      fontSize: pending.fontSize,
+      r: color.r,
+      g: color.g,
+      b: color.b,
+      maxWidth: _working.width.toDouble(),
+    );
+    if (!mounted) {
+      return;
+    }
+    compositeOver(
+      _working,
+      stamp,
+      offsetX: pending.position.dx.round(),
+      offsetY: pending.position.dy.round(),
+    );
+    setState(() {
+      _pendingText = null;
+      _baseVersion += 1;
+    });
+    AppStateScope.of(context).commitEdit(_working.clone());
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
@@ -139,26 +284,37 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
       appBar: AppBar(
         title: const Text('画布编辑'),
         actions: <Widget>[
-          IconButton(
-            tooltip: '撤销',
-            icon: const Icon(Icons.undo),
-            onPressed: state.canUndo
-                ? () {
-                    state.undoEdit();
-                    _syncFromState();
-                  }
-                : null,
-          ),
-          IconButton(
-            tooltip: '重做',
-            icon: const Icon(Icons.redo),
-            onPressed: state.canRedo
-                ? () {
-                    state.redoEdit();
-                    _syncFromState();
-                  }
-                : null,
-          ),
+          if (_pendingText != null) ...<Widget>[
+            TextButton(
+              onPressed: () => setState(() => _pendingText = null),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: _placeText,
+              child: const Text('放置'),
+            ),
+          ] else ...<Widget>[
+            IconButton(
+              tooltip: '撤销',
+              icon: const Icon(Icons.undo),
+              onPressed: state.canUndo
+                  ? () {
+                      state.undoEdit();
+                      _syncFromState();
+                    }
+                  : null,
+            ),
+            IconButton(
+              tooltip: '重做',
+              icon: const Icon(Icons.redo),
+              onPressed: state.canRedo
+                  ? () {
+                      state.redoEdit();
+                      _syncFromState();
+                    }
+                  : null,
+            ),
+          ],
         ],
       ),
       body: Column(
@@ -179,12 +335,37 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
                       height: displayHeight,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onPanStart: (DragStartDetails details) =>
-                            _beginStroke(_toImage(details.localPosition, scale)),
-                        onPanUpdate: (DragUpdateDetails details) =>
-                            _extendStroke(_toImage(details.localPosition, scale)),
-                        onPanEnd: (DragEndDetails details) => _endStroke(),
-                        onPanCancel: _endStroke,
+                        onPanStart: (DragStartDetails details) {
+                          if (_pendingText != null) {
+                            _lastLocalPosition = details.localPosition;
+                            return;
+                          }
+                          _beginStroke(_toImage(details.localPosition, scale));
+                        },
+                        onPanUpdate: (DragUpdateDetails details) {
+                          final _TextPending? pending = _pendingText;
+                          if (pending != null) {
+                            final Offset delta =
+                                (details.localPosition - _lastLocalPosition) /
+                                    scale;
+                            _lastLocalPosition = details.localPosition;
+                            setState(() => pending.position += delta);
+                            return;
+                          }
+                          _extendStroke(_toImage(details.localPosition, scale));
+                        },
+                        onPanEnd: (DragEndDetails details) {
+                          if (_pendingText != null) {
+                            return;
+                          }
+                          _endStroke();
+                        },
+                        onPanCancel: () {
+                          if (_pendingText != null) {
+                            return;
+                          }
+                          _endStroke();
+                        },
                         child: RepaintBoundary(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
@@ -209,6 +390,13 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
                                     repaint: _strokeTick,
                                   ),
                                 ),
+                                if (_pendingText != null)
+                                  CustomPaint(
+                                    painter: _TextGhostPainter(
+                                      pending: _pendingText!,
+                                      scale: scale,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -246,6 +434,11 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
                       onPressed: _fillWhite,
                       icon: const Icon(Icons.format_color_reset),
                       label: const Text('填白'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pendingText == null ? _showTextDialog : null,
+                      icon: const Icon(Icons.text_fields),
+                      label: const Text('文字'),
                     ),
                   ],
                 ),
@@ -430,4 +623,53 @@ class _ColorChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 还没有落盘的文字块（可以拖动定位）。
+class _TextPending {
+  _TextPending({
+    required this.text,
+    required this.fontSize,
+    required this.colorIndex,
+    required this.position,
+  });
+
+  final String text;
+  final double fontSize;
+  final int colorIndex;
+
+  /// 左上角坐标（图片坐标系），拖动时会变。
+  Offset position;
+}
+
+/// 定位阶段画的文字预览（按屏幕比例缩放）。
+class _TextGhostPainter extends CustomPainter {
+  _TextGhostPainter({required this.pending, required this.scale});
+
+  final _TextPending pending;
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final BrushColor color = kBrushColors[pending.colorIndex];
+    final TextPainter painter = TextPainter(
+      text: TextSpan(
+        text: pending.text,
+        style: TextStyle(
+          fontSize: pending.fontSize * scale,
+          height: 1.2,
+          color: Color.fromARGB(255, color.r, color.g, color.b),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width);
+    painter.paint(
+      canvas,
+      Offset(pending.position.dx * scale, pending.position.dy * scale),
+    );
+    painter.dispose();
+  }
+
+  @override
+  bool shouldRepaint(covariant _TextGhostPainter oldDelegate) => true;
 }

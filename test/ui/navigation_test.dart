@@ -100,6 +100,25 @@ void main() {
     expect(find.text('画布与传图'), findsOneWidget);
   });
 
+  testWidgets('画布编辑页能打开文字对话框', (WidgetTester tester) async {
+    await tester.pumpWidget(const EpdControllerApp());
+
+    await tester.tap(find.text('编辑并发送'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('画布编辑'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('文字'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加文字'), findsOneWidget);
+    expect(find.text('文字内容'), findsOneWidget);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加文字'), findsNothing);
+    expect(find.text('画布编辑'), findsOneWidget);
+  });
+
   testWidgets('未连接时设备控制按钮禁用', (WidgetTester tester) async {
     await tester.pumpWidget(const EpdControllerApp());
 
