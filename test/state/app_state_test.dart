@@ -87,7 +87,8 @@ void main() {
       expect(state.connectedDevice!.id, device.id);
       expect(state.firmwareVersion, FakeBleService.firmwareVersion);
       expect(state.firmwareVersionText, '0x1A');
-      // 版本 0x1a >= 0x16，所以 RLE 自动开启。
+      // RLE 不按版本号猜，只认固件通知里的 rle=1（web 版同此逻辑）；
+      // 模拟固件在 INIT 之后回了 `mtu=20 rle=1`，所以这里是 true。
       expect(state.rleSupported, isTrue);
       expect(state.pinsText.split(' ').length, 7);
       expect(state.config, isNotNull);

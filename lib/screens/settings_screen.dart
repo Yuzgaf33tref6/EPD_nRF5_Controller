@@ -160,8 +160,11 @@ class SettingsScreen extends StatelessWidget {
                         contentPadding: EdgeInsets.zero,
                         value: state.rleSupported,
                         onChanged: state.setRleSupported,
-                        title: const Text('假定固件支持 RLE'),
-                        subtitle: const Text('固件版本 ≥ 0x16 时连接后会自动开启'),
+                        title: const Text('强制启用 RLE 压缩传输'),
+                        subtitle: const Text(
+                          '默认只认固件通知里的 rle=1（与 web 版一致）；'
+                          '固件不支持时强行打开会让屏幕刷成乱块',
+                        ),
                       ),
                     ],
                   ),

@@ -470,8 +470,11 @@ class AppState extends ChangeNotifier {
     );
 
     _firmwareVersion = await _ble.readFirmwareVersion();
-    _rleSupported =
-        _firmwareVersion != null && _firmwareVersion! >= kMinRleFirmwareVersion;
+    // RLE 只认固件在通知里明确说的 `rle=1`（web 版就是这么判的，见
+    // `html/js/main.js:404`）。以前这里按版本号猜「>= 0x16 就支持 RLE」，
+    // 结果在 0x19 的固件上打开了 RLE，而该固件并不支持 —— 屏幕刷出来
+    // 全是乱块（每行的空白被当成 run code 吞掉）。默认关，等通知再说。
+    _rleSupported = false;
     _notificationSubscription =
         _ble.notifications.listen(_handleNotification);
 
