@@ -128,7 +128,10 @@ class AppState extends ChangeNotifier {
   static const int _targetMtu = 247;
 
   /// 分块档位：稳定 18 / 正常 64 / 快速 128 / 最大吃满 / 自定义。
-  TransferSpeed _speed = TransferSpeed.normal;
+  ///
+  /// 默认用「最大」：真机验证 242 字节（MTU 247 下的理论上限）稳定可传，
+  /// 400×300 三色从 1600 多条写降到 130 条左右，明显快。
+  TransferSpeed _speed = TransferSpeed.max;
 
   /// 自定义档每块的字节数（只在 [TransferSpeed.custom] 下生效）。
   int _customChunkBytes = 128;

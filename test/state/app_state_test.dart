@@ -111,11 +111,11 @@ void main() {
       // 连接时主动协商到 247；固件那条过时的 mtu=20 不会把协商结果打回去。
       expect(state.mtu, 247);
       // 一条写请求最多 ATT_MTU - 3 = 244 字节；再减命令字与 flag。默认档位是
-      // 「正常」（64 字节/块）。
+      // 「最大」（吃满 242 字节/块）。
       expect(state.writeMtu, 244);
-      expect(state.speed, TransferSpeed.normal);
-      expect(state.writeChunkBytes, 64);
-      expect(state.planMtu, 66);
+      expect(state.speed, TransferSpeed.max);
+      expect(state.writeChunkBytes, 242);
+      expect(state.planMtu, 244);
     });
 
     test('切换分块档位会改变每块字节数', () {
@@ -123,7 +123,8 @@ void main() {
       // 未连接时 MTU 还是固件默认的 20，所以各档都被压到 ATT_MTU-3-2 = 15。
       expect(state.writeChunkBytes, 15);
       state.setMtu(247);
-      expect(state.writeChunkBytes, 64);
+      // 默认档是「最大」，吃满 242。
+      expect(state.writeChunkBytes, 242);
       state.setSpeed(TransferSpeed.stable);
       expect(state.writeChunkBytes, 18);
       state.setSpeed(TransferSpeed.fast);
