@@ -14,6 +14,7 @@ import 'package:epd_controller/protocol/transfer.dart';
 import 'package:epd_controller/services/ble_service.dart';
 import 'package:epd_controller/services/fake_ble_service.dart';
 import 'package:epd_controller/services/image_pick_service.dart';
+import 'package:epd_controller/services/settings_store.dart';
 import 'package:epd_controller/state/app_state.dart';
 
 /// 这些测试里所有延时都设成 0，避免真等。
@@ -437,6 +438,82 @@ void main() {
       }
       expect(state.logs.length, 200);
       expect(state.logs.last.message, 'line 299');
+    });
+  });
+
+  group('设置持久化', () {
+    test('改设置会写进 store', () async {
+      final MemorySettingsStore store = MemorySettingsStore();
+      final AppState state = AppState(
+        bleService: buildFake(),
+        settingsStore: store,
+        scanDelay: Duration.zero,
+        connectDelay: Duration.zero,
+        autoReconnect: false,
+      );
+      await settle();
+
+      state.setSpeed(TransferSpeed.fast);
+      state.setVerboseTransfers(false);
+      state.setThemeMode(ThemeMode.dark);
+      state.setInterleavedCount(33);
+      await settle();
+
+      expect(store.saveCount, greaterThan(0));
+      final Map<String, Object?>? saved = store.data;
+      expect(saved, isNotNull);
+      expect(saved!['speed'], 'fast');
+      expect(saved['verboseTransfers'], false);
+      expect(saved['themeMode'], 'dark');
+      expect(saved['interleavedCount'], 33);
+      expect(saved['version'], AppState.kSettingsVersion);
+    });
+
+    test('启动时恢复上次保存的设置', () async {
+      final MemorySettingsStore store = MemorySettingsStore(<String, Object?>{
+        'version': AppState.kSettingsVersion,
+        'themeMode': 'dark',
+        'driverId': '0c',
+        'speed': 'fast',
+        'customChunkBytes': 200,
+        'interleavedCount': 33,
+        'interleavedOverride': true,
+        'rleSupported': false,
+        'verboseTransfers': false,
+      });
+      final AppState state = AppState(
+        bleService: buildFake(),
+        settingsStore: store,
+        scanDelay: Duration.zero,
+        connectDelay: Duration.zero,
+        autoReconnect: false,
+      );
+      await settle();
+
+      expect(state.driver.id, '0c');
+      expect(state.canvasSize.width, 800);
+      expect(state.canvasSize.height, 480);
+      expect(state.speed, TransferSpeed.fast);
+      expect(state.themeMode, ThemeMode.dark);
+      expect(state.interleavedCount, 33);
+      expect(state.interleavedCountOverridden, isTrue);
+      expect(state.verboseTransfers, isFalse);
+      // 恢复了驱动，示例图应当按新画布尺寸重生成
+      expect(state.sourceImage.width, 800);
+    });
+
+    test('设置文件读不到时用默认值', () async {
+      final AppState state = AppState(
+        bleService: buildFake(),
+        settingsStore: MemorySettingsStore(),
+        scanDelay: Duration.zero,
+        connectDelay: Duration.zero,
+        autoReconnect: false,
+      );
+      await settle();
+      expect(state.driver.id, '03');
+      expect(state.speed, TransferSpeed.max);
+      expect(state.themeMode, ThemeMode.system);
     });
   });
 }

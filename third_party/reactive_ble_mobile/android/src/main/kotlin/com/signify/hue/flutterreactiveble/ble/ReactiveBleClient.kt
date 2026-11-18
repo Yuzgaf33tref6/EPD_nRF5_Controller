@@ -335,12 +335,13 @@ open class ReactiveBleClient(private val context: Context) : BleClient {
                         characteristicInstanceId,
                     ).flatMapObservable { characteristic ->
                         // [PATCHED] 上游此处对「有 CCCD 描述符」的特征用 DEFAULT。DEFAULT 模式是
-                        // 「写 CCCD 完成之后」才把通知流交给上层，因此设备在收到 CCCD 写入的那一刻
-                        // 立刻推送的第一条通知会落在「设备已发、App 还没开始监听」的窗口里被丢弃。
-                        // EPD-nRF5 固件正是这种行为（EPD_service.c:275 收到 CCCD 立刻发一次配置通知）。
-                        // QUICK_SETUP 会在写 CCCD 之前先把通知流交给上层（RxAndroidBle 官方 javadoc：
-                        // DEFAULT「some early notifications may be lost — see QUICK_SETUP」），
-                        // 从而能收到这条 13 字节的引脚/驱动配置。
+                        // 「写 CCCD 完成之后」才把通知的交由上层，因此设备在收到 CCCD 写入的那一刻
+                        // 立刻推送的第一条通知，会落在「设备已发、App 还没开始监听」的窗口里被丢弃。
+                        // EPD-nRF5 固件正是这种行为（EPD_service.c:275 收到 CCCD 后立刻发一次
+                        // 13 字节的引脚/驱动配置通知）。QUICK_SETUP 会在写 CCCD 之前就把通知流
+                        // 交给上层 —— RxAndroidBle 官方 javadoc 对 DEFAULT 的说明原文是：
+                        // 「If a device starts to notify right after CLIENT_CHARACTERISTIC_CONFIG is
+                        // written then some early notifications may be lost — see QUICK_SETUP」。
                         val mode =
                             if (characteristic.descriptors.isEmpty()) {
                                 NotificationSetupMode.COMPAT

@@ -30,6 +30,7 @@ import '../protocol/transfer.dart';
 import '../services/ble_service.dart';
 import '../services/image_pick_service.dart';
 import '../services/fake_ble_service.dart';
+import '../services/settings_store.dart';
 
 /// 日志级别，决定日志面板里的颜色。
 enum LogLevel { info, success, warning, error }
@@ -70,12 +71,14 @@ class AppState extends ChangeNotifier {
   AppState({
     EpdBleService? bleService,
     ImagePickService? imagePickService,
+    SettingsStore? settingsStore,
     Duration scanDelay = const Duration(milliseconds: 700),
     Duration connectDelay = const Duration(milliseconds: 450),
     bool autoReconnect = true,
   })  : _scanDelay = scanDelay,
         _autoReconnect = autoReconnect,
         _imagePick = imagePickService ?? GalleryImagePickService(),
+        _settings = settingsStore ?? MemorySettingsStore(),
         _ble = bleService ??
             FakeBleService(scanDelay: scanDelay, connectDelay: connectDelay) {
     _sourceImage =
@@ -86,10 +89,19 @@ class AppState extends ChangeNotifier {
           ? '就绪：当前使用模拟蓝牙，可先熟悉界面与传图参数'
           : '就绪：已注入蓝牙实现',
     );
+    unawaited(_restoreSettings());
   }
 
   final EpdBleService _ble;
   final Duration _scanDelay;
+
+  /// 设置持久化（默认内存实现，真机由 main.dart 注入文件实现）。
+  final SettingsStore _settings;
+
+  /// 保存设置时用的版本号，将来改结构时可以据此迁移。
+  static const int kSettingsVersion = 1;
+
+  bool _disposed = false;
 
   /// 意外断开后是否自动重连（默认真机开启，测试里关掉以保证确定性）。
   final bool _autoReconnect;
@@ -235,6 +247,7 @@ class AppState extends ChangeNotifier {
     }
     _verboseTransfers = value;
     addLog(LogLevel.info, value ? '已开启详细传输日志（logcat 可见每条报文）' : '已关闭详细传输日志');
+    _persistSettings();
     notifyListeners();
   }
 
@@ -967,6 +980,7 @@ class AppState extends ChangeNotifier {
       '驱动切换为 ${driver.label}（${driver.canvasSize.width}×'
       '${driver.canvasSize.height}，${driver.colorMode.jsName}）',
     );
+    _persistSettings();
     notifyListeners();
   }
 
@@ -1016,6 +1030,7 @@ class AppState extends ChangeNotifier {
       LogLevel.info,
       '分块档位：${value.label}（每块 $writeChunkBytes 字节）',
     );
+    _persistSettings();
     notifyListeners();
   }
 
@@ -1031,6 +1046,7 @@ class AppState extends ChangeNotifier {
     }
     _customChunkBytes = clamped;
     addLog(LogLevel.info, '自定义分块：每块 $clamped 字节');
+    _persistSettings();
     notifyListeners();
   }
 
@@ -1038,9 +1054,11 @@ class AppState extends ChangeNotifier {
     final int clamped = value < 1 ? 1 : (value > 100 ? 100 : value);
     _interleavedCountOverride = true;
     if (clamped == _interleavedCount) {
+      _persistSettings();
       return;
     }
     _interleavedCount = clamped;
+    _persistSettings();
     notifyListeners();
   }
 
@@ -1052,6 +1070,7 @@ class AppState extends ChangeNotifier {
     }
     _rleSupported = value;
     addLog(LogLevel.info, value ? '已假定固件支持 RLE' : '已关闭 RLE');
+    _persistSettings();
     notifyListeners();
   }
 
@@ -1159,6 +1178,100 @@ class AppState extends ChangeNotifier {
       return;
     }
     _themeMode = mode;
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 组装要保存的设置快照。
+  Map<String, Object?> _settingsSnapshot() => <String, Object?>{
+        'version': kSettingsVersion,
+        'themeMode': _themeMode.name,
+        'driverId': _driver.id,
+        'speed': _speed.name,
+        'customChunkBytes': _customChunkBytes,
+        'interleavedCount': _interleavedCount,
+        'interleavedOverride': _interleavedCountOverride,
+        'rleSupported': _rleSupported,
+        'verboseTransfers': _verboseTransfers,
+      };
+
+  /// 把当前设置写出去（异步、失败只记日志，不影响使用）。
+  void _persistSettings() {
+    final Map<String, Object?> snapshot = _settingsSnapshot();
+    unawaited(
+      _settings.save(snapshot).catchError((Object error) {
+        if (!_disposed) {
+          addLog(LogLevel.warning, '保存设置失败：$error');
+        }
+      }),
+    );
+  }
+
+  /// 启动时读取上次保存的设置。[SettingsStore.load] 不会抛异常，读不到就用默认值。
+  Future<void> _restoreSettings() async {
+    final Map<String, Object?>? data = await _settings.load();
+    if (data == null || _disposed) {
+      return;
+    }
+
+    final Object? themeName = data['themeMode'];
+    if (themeName is String) {
+      _themeMode = switch (themeName) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+    }
+
+    final Object? driverId = data['driverId'];
+    if (driverId is String) {
+      final EpdDriver? driver = driverById(driverId);
+      if (driver != null && driver.id != _driver.id) {
+        _driver = driver;
+        // 启动阶段底图永远是示例图，按新画布尺寸重生成即可。
+        _sourceImage =
+            sampleImage(_driver.canvasSize.width, _driver.canvasSize.height);
+        _invalidatePreview();
+      }
+    }
+
+    final Object? speedName = data['speed'];
+    if (speedName is String) {
+      for (final TransferSpeed candidate in TransferSpeed.values) {
+        if (candidate.name == speedName) {
+          _speed = candidate;
+          break;
+        }
+      }
+    }
+
+    final Object? customChunkBytes = data['customChunkBytes'];
+    if (customChunkBytes is int) {
+      _customChunkBytes = customChunkBytes;
+    }
+
+    final Object? interleavedCount = data['interleavedCount'];
+    if (interleavedCount is int) {
+      _interleavedCount = interleavedCount < 1
+          ? 1
+          : (interleavedCount > 100 ? 100 : interleavedCount);
+      _interleavedCountOverride = data['interleavedOverride'] == true;
+    }
+
+    final Object? rleSupported = data['rleSupported'];
+    if (rleSupported is bool) {
+      _rleSupported = rleSupported;
+    }
+
+    final Object? verboseTransfers = data['verboseTransfers'];
+    if (verboseTransfers is bool) {
+      _verboseTransfers = verboseTransfers;
+    }
+
+    if (_disposed) {
+      return;
+    }
+    addLog(LogLevel.info, '已恢复上次的设置');
     notifyListeners();
   }
 
@@ -1177,6 +1290,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _notificationSubscription?.cancel();
     super.dispose();
   }
