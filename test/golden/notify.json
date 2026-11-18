@@ -1,0 +1,46 @@
+{
+ "source": "html/js/main.js handleNotify()",
+ "cases": [
+  {
+   "name": "config_7pins_plus_driver",
+   "input": "060708090a0b0c03",
+   "isConfig": true,
+   "pins": "060708090a0b0c",
+   "driver": "03"
+  },
+  {
+   "name": "config_11bytes_extra_pin",
+   "input": "060708090a0b0c03001011",
+   "isConfig": true,
+   "pins": "060708090a0b0c11",
+   "driver": "03"
+  },
+  {
+   "name": "text_mtu_rle",
+   "input": "6d74753d32343720726c653d31",
+   "isConfig": false,
+   "rawText": "mtu=247 rle=1",
+   "mtu": 247,
+   "rle": true,
+   "remoteSeconds": null
+  },
+  {
+   "name": "text_mtu_only",
+   "input": "6d74753d313835",
+   "isConfig": false,
+   "rawText": "mtu=185",
+   "mtu": 185,
+   "rle": false,
+   "remoteSeconds": null
+  },
+  {
+   "name": "text_time",
+   "input": "743d31373633353030303030",
+   "isConfig": false,
+   "rawText": "t=1763500000",
+   "mtu": null,
+   "rle": false,
+   "remoteSeconds": 1763500000
+  }
+ ]
+}

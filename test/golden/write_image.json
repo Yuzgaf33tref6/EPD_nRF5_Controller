@@ -1,0 +1,3820 @@
+{
+ "source": "html/js/main.js writeImage() (逐行等价复刻)",
+ "cases": [
+  {
+   "input": "0000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "0000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "8200"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "00"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "01"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "02"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "03"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "04"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "05"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "06"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "07"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "08"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "09"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0a"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "0b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "10"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "11"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "12"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "13"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "000102030405060708090a0b0c0d0e0f10111213",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "000102030405060708090a0b0c0d0e0f10111213"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "ffff000000000000000000ffff00000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000ffff000000000000000000ffff0000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "00000000ffff000000000000000000ffff000000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ffff000000000000000000ffff00000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000ffff000000000000000000ffff0000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "00000000ffff000000000000000000ffff000000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "01ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff8600"
+    },
+    {
+     "flag": 5,
+     "withResponse": false,
+     "data": "01ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": true,
+     "data": "01ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff8600"
+    },
+    {
+     "flag": 5,
+     "withResponse": false,
+     "data": "01ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": true,
+     "data": "8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": true,
+     "data": "8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "8600"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "00ff"
+    },
+    {
+     "flag": 4,
+     "withResponse": true,
+     "data": "8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff860001ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000"
+    }
+   ]
+  },
+  {
+   "input": "ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000000000000000ffff000000",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "01ffff860001ffff860001ffff860001ffff860001ffff860001ffff8000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 7,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "ff00"
+    },
+    {
+     "flag": 4,
+     "withResponse": false,
+     "data": "c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    }
+   ]
+  },
+  {
+   "input": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": true,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 6,
+     "withResponse": false,
+     "data": "ff00c300"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5ca"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "ef14395e83a8cdf2173c6186abd0f51a3f6489ae"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "d3f81d42678cb1d6fb20456a8fb4d9fe23486d92"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "b7dc01264b7095badf04294e7398bde2072c5176"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "9bc0e50a2f54799ec3e80d32577ca1c6eb10355a"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "7fa4c9ee13385d82a7ccf1163b6085aacff4193e"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "6388add2f71c41668bb0d5fa1f44698eb3d8fd22"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "476c91b6db00254a6f94b9de03284d7297bce106"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "2b50759abfe4092e53789dc2e70c31567ba0c5ea"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "0f34597ea3c8ed12375c81a6cbf0153a5f84a9ce"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "f3183d6287acd1f61b40658aafd4f91e43688db2"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "d7fc21466b90b5daff24496e93b8dd02274c7196"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "bbe0052a4f7499bee3082d52779cc1e60b30557a"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "9fc4e90e33587da2c7ec11365b80a5caef14395e"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5ca"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "ef14395e83a8cdf2173c6186abd0f51a3f6489ae"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "d3f81d42678cb1d6fb20456a8fb4d9fe23486d92"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "b7dc01264b7095badf04294e7398bde2072c5176"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "9bc0e50a2f54799ec3e80d32577ca1c6eb10355a"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "7fa4c9ee13385d82a7ccf1163b6085aacff4193e"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "6388add2f71c41668bb0d5fa1f44698eb3d8fd22"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "476c91b6db00254a6f94b9de03284d7297bce106"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "2b50759abfe4092e53789dc2e70c31567ba0c5ea"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "0f34597ea3c8ed12375c81a6cbf0153a5f84a9ce"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "f3183d6287acd1f61b40658aafd4f91e43688db2"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "d7fc21466b90b5daff24496e93b8dd02274c7196"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "bbe0052a4f7499bee3082d52779cc1e60b30557a"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "9fc4e90e33587da2c7ec11365b80a5caef14395e"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5ca"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ef14395e83a8cdf2173c6186abd0f51a3f6489ae"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d3f81d42678cb1d6fb20456a8fb4d9fe23486d92"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b7dc01264b7095badf04294e7398bde2072c5176"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9bc0e50a2f54799ec3e80d32577ca1c6eb10355a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7fa4c9ee13385d82a7ccf1163b6085aacff4193e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6388add2f71c41668bb0d5fa1f44698eb3d8fd22"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "476c91b6db00254a6f94b9de03284d7297bce106"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2b50759abfe4092e53789dc2e70c31567ba0c5ea"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0f34597ea3c8ed12375c81a6cbf0153a5f84a9ce"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f3183d6287acd1f61b40658aafd4f91e43688db2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d7fc21466b90b5daff24496e93b8dd02274c7196"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bbe0052a4f7499bee3082d52779cc1e60b30557a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9fc4e90e33587da2c7ec11365b80a5caef14395e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5ca"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "ef14395e83a8cdf2173c6186abd0f51a3f6489ae"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "d3f81d42678cb1d6fb20456a8fb4d9fe23486d92"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "b7dc01264b7095badf04294e7398bde2072c5176"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "9bc0e50a2f54799ec3e80d32577ca1c6eb10355a"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "7fa4c9ee13385d82a7ccf1163b6085aacff4193e"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "6388add2f71c41668bb0d5fa1f44698eb3d8fd22"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "476c91b6db00254a6f94b9de03284d7297bce106"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "2b50759abfe4092e53789dc2e70c31567ba0c5ea"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "0f34597ea3c8ed12375c81a6cbf0153a5f84a9ce"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "f3183d6287acd1f61b40658aafd4f91e43688db2"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "d7fc21466b90b5daff24496e93b8dd02274c7196"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "bbe0052a4f7499bee3082d52779cc1e60b30557a"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "9fc4e90e33587da2c7ec11365b80a5caef14395e"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "14395e83a8cdf2173c6186abd0f51a3f6489aed3f8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "264b7095badf04294e7398bde2072c51769bc0e50a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "385d82a7ccf1163b6085aacff4193e6388add2f71c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "41668bb0d5fa1f44698eb3d8fd22476c91b6db0025"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "4a6f94b9de03284d7297bce1062b50759abfe4092e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "53789dc2e70c31567ba0c5ea0f34597ea3c8ed1237"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "5c81a6cbf0153a5f84a9cef3183d6287acd1f61b40"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "658aafd4f91e43688db2d7fc21466b90b5daff2449"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "6e93b8dd02274c7196bbe0052a4f7499bee3082d52"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "779cc1e60b30557a9fc4e90e33587da2c7ec11365b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "80a5caef14395e83a8cdf2173c6186abd0f51a3f64"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "89aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "14395e83a8cdf2173c6186abd0f51a3f6489aed3f8"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "1d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "264b7095badf04294e7398bde2072c51769bc0e50a"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "385d82a7ccf1163b6085aacff4193e6388add2f71c"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "41668bb0d5fa1f44698eb3d8fd22476c91b6db0025"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "4a6f94b9de03284d7297bce1062b50759abfe4092e"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "53789dc2e70c31567ba0c5ea0f34597ea3c8ed1237"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "5c81a6cbf0153a5f84a9cef3183d6287acd1f61b40"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "658aafd4f91e43688db2d7fc21466b90b5daff2449"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "6e93b8dd02274c7196bbe0052a4f7499bee3082d52"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "779cc1e60b30557a9fc4e90e33587da2c7ec11365b"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "80a5caef14395e83a8cdf2173c6186abd0f51a3f64"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "89aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "0b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "30"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "55"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "c4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "33"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "58"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "a2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c7"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ec"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "11"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "36"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "80"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a5"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ca"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ef"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "14"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "39"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "5e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "83"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "17"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "3c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "61"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "86"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ab"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "1a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "64"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "89"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ae"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "f8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "42"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "67"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b1"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "d6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "fb"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "20"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "45"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "b4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "fe"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "23"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "48"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "92"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b7"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "dc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "01"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "26"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "70"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "95"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ba"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "df"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "04"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "29"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "4e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "73"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "98"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "07"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "2c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "51"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "76"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "0a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "54"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "79"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "e8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "32"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "57"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a1"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "c6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "eb"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "10"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "35"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "a4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ee"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "13"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "38"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "82"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a7"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "16"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "60"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "85"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "aa"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cf"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "19"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "3e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "63"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "88"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ad"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f7"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "1c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "41"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "66"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "fa"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "44"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "69"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "d8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "fd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "22"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "47"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "91"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "b6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "db"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "00"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "25"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "94"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "de"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "03"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "28"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "72"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "97"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "06"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "50"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "75"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bf"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "09"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "2e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "53"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "78"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e7"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "0c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "31"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "56"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "ea"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "34"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "59"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "c8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ed"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "12"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "37"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "81"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "a6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cb"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "15"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "84"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ce"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f3"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "18"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "62"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "87"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ac"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "40"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "65"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "af"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f9"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "1e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "43"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "68"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d7"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "fc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "21"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "46"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "90"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "da"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ff"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "24"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "49"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "93"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "b8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "dd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "02"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "27"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "71"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "96"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bb"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "05"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "74"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "99"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "be"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e3"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "08"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "52"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "77"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "30"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "55"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e9"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "0e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "33"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "58"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c7"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "ec"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "11"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "36"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "80"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a5"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "ca"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ef"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "14"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "39"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "83"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "a8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "17"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "61"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "86"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ab"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f5"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "64"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "89"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ae"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d3"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db00254a6f94b9de03284d7297bce1062b50759abfe4092e53789dc2e70c31567ba0c5ea0f34597ea3c8ed12375c81a6cbf0153a5f84a9cef3183d6287acd1f61b40658aafd4f91e43688db2d7fc21466b90b5daff24496e93b8dd02274c7196bbe0052a4f7499bee3082d52779cc1e60b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 15,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bc"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "d3ea01182f465d748ba2b9d0e7fe152c435a7188"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "9fb6cde4fb122940576e859cb3cae1f80f263d54"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "6b8299b0c7def50c233a51687f96adc4dbf20920"
+    },
+    {
+     "flag": 255,
+     "withResponse": false,
+     "data": "374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bc"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "d3ea01182f465d748ba2b9d0e7fe152c435a7188"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "9fb6cde4fb122940576e859cb3cae1f80f263d54"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "6b8299b0c7def50c233a51687f96adc4dbf20920"
+    },
+    {
+     "flag": 240,
+     "withResponse": false,
+     "data": "374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d3ea01182f465d748ba2b9d0e7fe152c435a7188"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9fb6cde4fb122940576e859cb3cae1f80f263d54"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6b8299b0c7def50c233a51687f96adc4dbf20920"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 22,
+   "interleavedCount": 50,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 20,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bc"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "d3ea01182f465d748ba2b9d0e7fe152c435a7188"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "9fb6cde4fb122940576e859cb3cae1f80f263d54"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "6b8299b0c7def50c233a51687f96adc4dbf20920"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 23,
+   "interleavedCount": 1,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bcd3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "ea01182f465d748ba2b9d0e7fe152c435a71889fb6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cde4fb122940576e859cb3cae1f80f263d546b8299"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "b0c7def50c233a51687f96adc4dbf20920374e657c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 23,
+   "interleavedCount": 2,
+   "step": "red",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 21,
+   "chunks": [
+    {
+     "flag": 3,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bcd3"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "ea01182f465d748ba2b9d0e7fe152c435a71889fb6"
+    },
+    {
+     "flag": 1,
+     "withResponse": true,
+     "data": "cde4fb122940576e859cb3cae1f80f263d546b8299"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "b0c7def50c233a51687f96adc4dbf20920374e657c"
+    },
+    {
+     "flag": 1,
+     "withResponse": false,
+     "data": "93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 3,
+   "interleavedCount": 5,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 1,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "07"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "35"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "63"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "7a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "91"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bf"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ed"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "04"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "32"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "49"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "60"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "77"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "8e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a5"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "bc"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d3"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ea"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "01"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "18"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "2f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "46"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "74"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "8b"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "a2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b9"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e7"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "fe"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "15"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "2c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "43"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "5a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "71"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "88"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9f"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "b6"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "cd"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "fb"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "12"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "29"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "40"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "57"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "85"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "9c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b3"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "ca"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "e1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "26"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3d"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "54"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "6b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "82"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "99"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "b0"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c7"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "de"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "f5"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "0c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "23"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "3a"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "51"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "68"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "7f"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "96"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ad"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c4"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "db"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "f2"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "09"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "20"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "37"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4e"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "65"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "7c"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "93"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "aa"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "c1"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d8"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ef"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "06"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "1d"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "34"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "4b"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "62"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "79"
+    },
+    {
+     "flag": 0,
+     "withResponse": true,
+     "data": "90"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "a7"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "be"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "d5"
+    },
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 251,
+   "interleavedCount": 50,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 251,
+   "interleavedCount": 3,
+   "step": "red",
+   "rleSupport": false,
+   "useRle": false,
+   "chunkSize": 249,
+   "chunks": [
+    {
+     "flag": 0,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  },
+  {
+   "input": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec",
+   "mtu": 512,
+   "interleavedCount": 10,
+   "step": "bw",
+   "rleSupport": true,
+   "useRle": false,
+   "chunkSize": 510,
+   "chunks": [
+    {
+     "flag": 2,
+     "withResponse": false,
+     "data": "071e354c637a91a8bfd6ed041b324960778ea5bcd3ea01182f465d748ba2b9d0e7fe152c435a71889fb6cde4fb122940576e859cb3cae1f80f263d546b8299b0c7def50c233a51687f96adc4dbf20920374e657c93aac1d8ef061d344b627990a7bed5ec"
+    }
+   ]
+  }
+ ]
+}
