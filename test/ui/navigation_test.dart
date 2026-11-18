@@ -35,6 +35,14 @@ void main() {
     await tester.tap(find.text('编辑并发送'));
     await tester.pumpAndSettle();
     expect(find.text('画布与传图'), findsOneWidget);
+    expect(find.text('预览（抖动后）'), findsOneWidget);
+
+    // 传图统计在列表下方，ListView 懒构建，必须先滚到可见位置。
+    await tester.scrollUntilVisible(
+      find.textContaining('条写指令'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.textContaining('条写指令'), findsOneWidget);
 
     await tester.pageBack();
