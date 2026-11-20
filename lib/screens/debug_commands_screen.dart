@@ -1,11 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../image/epd_color.dart';
 import '../protocol/debug_commands.dart';
-import '../protocol/epd_protocol.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 
@@ -228,9 +225,9 @@ class _ConfigCard extends StatefulWidget {
 
 class _ConfigCardState extends State<_ConfigCard> {
   late EpdConfigPayload _config = EpdConfigPayload.factoryDefault;
-  late final List<TextEditingController> _controllers = <TextEditingController>[
-    for (final ConfigField f in EpdConfigPayload.fields)
-      TextEditingController(text: _hex(_config.fieldAt(0))),
+  final List<TextEditingController> _controllers = <TextEditingController>[
+    for (int i = 0; i < EpdConfigPayload.fields.length; i++)
+      TextEditingController(),
   ];
 
   static String _hex(int v) =>
@@ -446,32 +443,6 @@ class _DangerCard extends StatelessWidget {
           },
         );
       },
-    );
-    return ok ?? false;
-  }
-
-  Future<bool> _confirmSimple(
-    BuildContext context, {
-    required String title,
-    required String message,
-    required String action,
-  }) async {
-    final bool? ok = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(action),
-          ),
-        ],
-      ),
     );
     return ok ?? false;
   }
