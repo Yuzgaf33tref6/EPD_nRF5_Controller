@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../widgets/app_info_card.dart';
 import '../widgets/common.dart';
 import 'diagnostics_screen.dart';
+import 'logs_screen.dart';
 import 'permission_screen.dart';
 import 'plane_check_screen.dart';
 import 'solid_color_screen.dart';

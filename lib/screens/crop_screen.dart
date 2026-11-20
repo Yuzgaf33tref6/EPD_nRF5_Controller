@@ -408,12 +408,6 @@ class _CropPainter extends CustomPainter {
     // 把源图坐标换算到预览图坐标后，直接整块贴到视口上。
     final double sx = previewSize.width / sourceSize.width;
     final double sy = previewSize.height / sourceSize.height;
-    final Rect srcRect = Rect.fromLTWH(
-      rect.left * sx,
-      rect.top * sy,
-      rect.width * sx,
-      rect.height * sy,
-    );
     final Rect dstRect = Offset.zero & size;
 
     canvas.save();
