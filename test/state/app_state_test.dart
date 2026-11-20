@@ -33,6 +33,15 @@ AppState buildState({FakeBleService? ble, ImagePickService? picker}) => AppState
       autoReconnect: false,
     );
 
+/// 带持久化桩的状态：用来验证新加的设置键会被写入 / 读回。
+AppState buildStateWithStore(MemorySettingsStore store) => AppState(
+      bleService: buildFake(),
+      settingsStore: store,
+      scanDelay: Duration.zero,
+      connectDelay: Duration.zero,
+      autoReconnect: false,
+    );
+
 /// 固定返回一张图的选图服务，用来避免测试碰真实相册。
 class FakePickService implements ImagePickService {
   FakePickService({this.result});
@@ -514,6 +523,119 @@ void main() {
       expect(state.driver.id, '03');
       expect(state.speed, TransferSpeed.max);
       expect(state.themeMode, ThemeMode.system);
+    });
+
+    test('驱动模式与上次设备也会写进 store 并恢复', () async {
+      final MemorySettingsStore store = MemorySettingsStore();
+      final AppState state = buildStateWithStore(store);
+      await settle();
+
+      state.setDriverMode(DriverSelectionMode.manual);
+      await settle();
+      expect(store.data?['driverMode'], 'manual');
+
+      final AppState restored = buildStateWithStore(MemorySettingsStore(
+        <String, Object?>{
+          'version': AppState.kSettingsVersion,
+          'driverMode': 'manual',
+          'lastDeviceId': 'C4:7F:51:00:00:01',
+          'lastDeviceName': 'EPD-4.2-BWR',
+          'driverWarningMuted': true,
+        },
+      ));
+      await settle();
+      expect(restored.driverMode, DriverSelectionMode.manual);
+      expect(restored.lastDeviceId, 'C4:7F:51:00:00:01');
+      expect(restored.lastDeviceName, 'EPD-4.2-BWR');
+      expect(restored.hasLastDevice, isTrue);
+      expect(restored.driverWarningMuted, isTrue);
+    });
+  });
+
+  group('驱动选择模式', () {
+    test('自动模式下按固件上报的驱动号切换', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+      // FakeBleService 上报 0x03。
+      expect(state.driverMode, DriverSelectionMode.auto);
+      expect(state.driver.id, '03');
+      expect(state.hasConfig, isTrue);
+    });
+
+    test('手动模式不跟随固件上报', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      state.setDriver(driverById('0c')!);
+      state.setDriverMode(DriverSelectionMode.manual);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+      expect(state.driver.id, '0c');
+      expect(state.canvasSize.width, 800);
+    });
+
+    test('切回自动模式时立刻按已有配置同步', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+
+      state.setDriver(driverById('0c')!);
+      state.setDriverMode(DriverSelectionMode.manual);
+      await settle();
+      expect(state.driver.id, '0c');
+
+      state.setDriverMode(DriverSelectionMode.auto);
+      await settle();
+      expect(state.driver.id, '03');
+    });
+
+    test('没收到配置时才提示驱动可能错误', () async {
+      final AppState state = buildState();
+      // 未连接：不提示。
+      expect(state.shouldWarnDriverMismatch, isFalse);
+
+      // 静音后也不提示。
+      state.setDriverWarningMuted(true);
+      expect(state.shouldWarnDriverMismatch, isFalse);
+    });
+  });
+
+  group('启动权限检查', () {
+    test('权限被授予时 requestPermissions 为真，不写日志', () async {
+      final AppState state = buildState();
+      final int before = state.logs.length;
+      expect(await state.requestPermissions(), isTrue);
+      expect(state.permissionDenied, isFalse);
+      expect(state.logs.length, before);
+    });
+
+    test('权限被拒绝时 permissionDenied 为真', () async {
+      final AppState state = buildState(ble: buildFake(grantPermission: false));
+      expect(await state.requestPermissions(), isFalse);
+      expect(state.permissionDenied, isTrue);
+    });
+
+    test('ensurePermissionsOnce 只跑一次', () async {
+      final FakeBleService ble = buildFake(grantPermission: false);
+      final AppState state = buildState(ble: ble);
+      await state.ensurePermissionsOnce();
+      expect(state.permissionDenied, isTrue);
+      // 第二次不会再申请（即使这次允许，状态也不会变）。
+      await state.ensurePermissionsOnce();
+      expect(state.permissionDenied, isTrue);
+    });
+
+    test('retryPermissions 可以重新申请', () async {
+      final AppState state = buildState(ble: buildFake(grantPermission: false));
+      await state.ensurePermissionsOnce();
+      expect(state.permissionDenied, isTrue);
+      expect(await state.retryPermissions(), isFalse);
+      expect(state.permissionDenied, isTrue);
     });
   });
 }

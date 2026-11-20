@@ -6,7 +6,7 @@ import '../image/rgba_image.dart';
 import '../image/text_stamp.dart';
 import '../state/app_state.dart';
 import '../widgets/image_preview.dart';
-import '../widgets/section_card.dart';
+import '../widgets/common.dart';
 
 /// 画布编辑页：手绘、橡皮、撤销/重做、填充、改画笔颜色与粗细。
 ///

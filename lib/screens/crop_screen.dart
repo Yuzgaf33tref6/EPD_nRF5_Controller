@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../image/crop_geometry.dart';
 import '../image/image_transform.dart';
 import '../image/rgba_image.dart';
-import '../widgets/section_card.dart';
+import '../widgets/common.dart';
 
 /// 图片裁剪页。
 ///

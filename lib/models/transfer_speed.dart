@@ -33,3 +33,16 @@ enum TransferSpeed {
 
   bool get isMax => this == TransferSpeed.max;
 }
+
+/// 驱动的选择方式：自动按固件上报的驱动号匹配，或由用户手动指定。
+enum DriverSelectionMode {
+  /// 自动：连上设备后按固件推送的配置通知自动匹配（推荐）。
+  auto('自动'),
+
+  /// 手动：忽略固件上报，始终使用用户选中的驱动。
+  manual('手动');
+
+  const DriverSelectionMode(this.label);
+
+  final String label;
+}

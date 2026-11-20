@@ -1,80 +1,65 @@
-import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../image/rgba_image.dart';
+import '../protocol/epd_protocol.dart';
+import '../state/app_state.dart';
 
-/// 把 [RgbaImage] 画到屏幕上。
+/// 一张 RGBA 位图的绘制器。
 ///
-/// 逐像素画 12 万个方块会非常慢，所以这里按「同一行里连续相同的颜色」合并成一个矩形，
-/// 抖动后的图只有少数几种调色板颜色，合并后每行通常只有几十个矩形。
-class RgbaImagePreview extends StatelessWidget {
-  const RgbaImagePreview({super.key, required this.image});
-
-  final RgbaImage image;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: image.width / image.height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: CustomPaint(
-          painter: RgbaImagePainter(image),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
-  }
-}
-
-/// 位图画笔。公开出来给画布编辑页复用。
-///
-/// [version] 用于"图对象没换但内容被就地改了"的场景（手绘时必须逐笔重绘）；默认 0
-/// 表示按对象身份判断，抖动用它足够。
+/// 直接把 12 万像素逐点画会慢到掉帧，所以按「同一行里连续相同颜色」合并成矩形，
+/// 一张墨水屏图通常几千个矩形就够，重绘开销可以接受。
 class RgbaImagePainter extends CustomPainter {
   RgbaImagePainter(this.image, {this.version = 0});
 
   final RgbaImage image;
+
+  /// 外部版本号。手绘时是**就地**改同一张图，[shouldRepaint] 靠它判断要不要重画。
   final int version;
+
+  final Map<int, Color> _colorCache = <int, Color>{};
 
   @override
   void paint(Canvas canvas, Size size) {
     final int width = image.width;
     final int height = image.height;
+    if (width == 0 || height == 0) {
+      return;
+    }
     final double scaleX = size.width / width;
     final double scaleY = size.height / height;
-    final Paint paint = Paint()..style = PaintingStyle.fill;
+    final Paint paint = Paint()..isAntiAlias = false;
     final Uint8List data = image.data;
 
     for (int y = 0; y < height; y++) {
       int x = 0;
       while (x < width) {
-        final int i = (y * width + x) * 4;
-        final int r = data[i];
-        final int g = data[i + 1];
-        final int b = data[i + 2];
-        int end = x + 1;
-        while (end < width) {
-          final int j = (y * width + end) * 4;
-          if (data[j] != r || data[j + 1] != g || data[j + 2] != b) {
+        final int offset = (y * width + x) * 4;
+        final int r = data[offset];
+        final int g = data[offset + 1];
+        final int b = data[offset + 2];
+        final int key = (r << 16) | (g << 8) | b;
+        int runEnd = x + 1;
+        while (runEnd < width) {
+          final int o2 = (y * width + runEnd) * 4;
+          if (data[o2] != r || data[o2 + 1] != g || data[o2 + 2] != b) {
             break;
           }
-          end++;
+          runEnd++;
         }
-        paint.color = Color.fromARGB(255, r, g, b);
+        paint.color = _colorCache[key] ??=
+            Color.fromARGB(255, r, g, b);
         canvas.drawRect(
           Rect.fromLTWH(
             x * scaleX,
             y * scaleY,
-            (end - x) * scaleX,
-            scaleY,
+            (runEnd - x) * scaleX + 0.5,
+            scaleY + 0.5,
           ),
           paint,
         );
-        x = end;
+        x = runEnd;
       }
     }
   }
@@ -83,5 +68,107 @@ class RgbaImagePainter extends CustomPainter {
   bool shouldRepaint(covariant RgbaImagePainter oldDelegate) {
     return oldDelegate.version != version ||
         !identical(oldDelegate.image, image);
+  }
+}
+
+/// 一张位图的展示组件：按图片宽高比铺满可用宽度。
+class RgbaImagePreview extends StatelessWidget {
+  const RgbaImagePreview({
+    super.key,
+    required this.image,
+    this.version = 0,
+    this.maxWidth = 360,
+  });
+
+  final RgbaImage image;
+
+  /// 与 [RgbaImagePainter.version] 配套使用。
+  final int version;
+
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: AspectRatio(
+            aspectRatio: image.width / math.max(1, image.height),
+            child: CustomPaint(
+              painter: RgbaImagePainter(image, version: version),
+              size: Size.infinite,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 墨水屏状态栏：展示设备名 + 最近一次操作的结果，作为「日志藏起来」后的替代反馈。
+class DeviceStatusBar extends StatelessWidget {
+  const DeviceStatusBar({super.key, required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final LogEntry? latest = state.latestLog;
+    final bool connected = state.isConnected;
+    final Color color = latest == null
+        ? theme.colorScheme.onSurfaceVariant
+        : switch (latest.level) {
+            LogLevel.success => theme.colorScheme.primary,
+            LogLevel.warning => Colors.orange.shade800,
+            LogLevel.error => theme.colorScheme.error,
+            LogLevel.info => theme.colorScheme.onSurfaceVariant,
+          };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            connected
+                ? Icons.bluetooth_connected
+                : Icons.bluetooth_disabled,
+            size: 15,
+            color: connected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            connected
+                ? (state.connectedDevice?.name ?? '已连接')
+                : '未连接',
+            style: theme.textTheme.labelSmall,
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 1,
+            height: 12,
+            color: theme.colorScheme.outlineVariant,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              latest?.message ?? '就绪',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

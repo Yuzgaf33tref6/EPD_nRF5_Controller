@@ -166,11 +166,35 @@ class AppState extends ChangeNotifier {
   /// 完全没反馈。8 秒足够覆盖最慢的一次写（实测约 90ms），又不至于让人干等。
   static const Duration kWriteTimeout = Duration(seconds: 8);
 
-  /// 是否往 logcat 打印每条写指令（诊断页开关）。
+  /// 是否往 logcat 打印每条写指令（设置页开关，会被持久化）。
   ///
-  /// 默认开启：本 App 目前不持久化设置，默认关闭的话每次重连后都要跑去诊断页
-  /// 手动打开，排查问题太费劲。正式发布前再考虑改成可持久化的开关。
-  bool _verboseTransfers = true;
+  /// 默认关闭：逐条打印一次传图会刷上百行，日常使用没必要。排查问题时在
+  /// 设置 → 诊断 里打开即可。
+  bool _verboseTransfers = false;
+
+  // ---- 驱动选择与连接记忆 ----
+  /// 驱动选择方式：自动（按固件上报匹配）/ 手动（用户指定，忽略固件）。
+  DriverSelectionMode _driverMode = DriverSelectionMode.auto;
+
+  /// 上次成功连接的设备 id，用于首页「连接 / 重连」快捷按钮。
+  String? _lastDeviceId;
+
+  /// 上次成功连接的设备名（仅用于界面展示）。
+  String? _lastDeviceName;
+
+  // ---- 驱动可能错误提示 ----
+  /// 本次启动内是否已经提示过「驱动可能错误」。
+  bool _driverWarningShownThisSession = false;
+
+  /// 用户勾选了「不再提示」（持久化）。
+  bool _driverWarningMuted = false;
+
+  // ---- 权限 ----
+  /// 启动后是否已经做过权限检查（避免每次重建首页都弹系统对话框）。
+  bool _permissionChecked = false;
+
+  /// 最近一次权限申请的结果；null 表示还未知。
+  bool? _permissionGranted;
 
   // ---- 图像与驱动 ----
   EpdDriver _driver = _defaultDriver;
@@ -269,8 +293,62 @@ class AppState extends ChangeNotifier {
   double get strength => _strength;
   double get contrast => _contrast;
 
+  /// 驱动选择方式。
+  DriverSelectionMode get driverMode => _driverMode;
+
+  /// 上次连接的设备 id（没有记录时为 null）。
+  String? get lastDeviceId => _lastDeviceId;
+
+  /// 上次连接的设备名（没有记录时为 null）。
+  String? get lastDeviceName => _lastDeviceName;
+
+  /// 是否有可用的「上次设备」记录（首页连接/重连按钮据此决定可用性）。
+  bool get hasLastDevice => _lastDeviceId != null;
+
+  /// 是否收到了固件的配置通知（引脚 + 驱动 id）。
+  bool get hasConfig => _config != null;
+
+  /// 是否需要提示「驱动可能错误」。
+  ///
+  /// 规则：已连接、没有收到配置通知、用户没勾「不再提示」、本次启动还没提示过。
+  /// 收到配置就说明驱动是固件自己报的，没有猜错的可能。
+  bool get shouldWarnDriverMismatch =>
+      isConnected &&
+      _config == null &&
+      !_driverWarningMuted &&
+      !_driverWarningShownThisSession;
+
+  /// 标记「驱动可能错误」已提示（本次启动内不再重复弹）。
+  void markDriverWarningShown() {
+    if (_driverWarningShownThisSession) {
+      return;
+    }
+    _driverWarningShownThisSession = true;
+    notifyListeners();
+  }
+
+  /// 设置「不再提示驱动可能错误」。
+  void setDriverWarningMuted(bool value) {
+    if (value == _driverWarningMuted) {
+      return;
+    }
+    _driverWarningMuted = value;
+    addLog(
+      LogLevel.info,
+      value ? '已关闭「驱动可能错误」提示' : '已重新开启「驱动可能错误」提示',
+    );
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 用户勾选过「不再提示驱动可能错误」。
+  bool get driverWarningMuted => _driverWarningMuted;
+
   ThemeMode get themeMode => _themeMode;
   List<LogEntry> get logs => List<LogEntry>.unmodifiable(_logs);
+
+  /// 最新一条日志（底部状态条用），没有日志时为 null。
+  LogEntry? get latestLog => _logs.isEmpty ? null : _logs.last;
 
   /// 固件版本展示用，例如 `0x1A`。
   String get firmwareVersionText {
@@ -517,6 +595,10 @@ class AppState extends ChangeNotifier {
     );
 
     addLog(LogLevel.success, '已连接 ${device.name}，固件版本 $firmwareVersionText');
+    // 记住这次连的设备，首页的「连接 / 重连」按钮下次直接用。
+    _lastDeviceId = device.id;
+    _lastDeviceName = device.name;
+    _persistSettings();
     addLog(
       LogLevel.info,
       '已订阅命令特征通知，自动发送 INIT 命令 …',
@@ -632,16 +714,29 @@ class AppState extends ChangeNotifier {
         '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}',
       );
       final EpdDriver? byCode = driverByCode(config.driver);
-      if (byCode != null && byCode.id != _driver.id) {
-        _driver = byCode;
-        _resampleSource();
+      if (byCode != null && _driverMode == DriverSelectionMode.auto) {
+        if (byCode.id != _driver.id) {
+          _driver = byCode;
+          _resampleSource();
+          addLog(
+            LogLevel.info,
+            '按固件上报的驱动同步为 ${byCode.label}',
+          );
+        }
+      } else if (_driverMode == DriverSelectionMode.manual) {
         addLog(
           LogLevel.info,
-          '按固件上报的驱动同步为 ${byCode.label}',
+          '固件上报驱动 id 0x'
+          '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}，'
+          '但当前为手动选择（${_driver.label}），不自动切换',
         );
-      } else {
-        addLog(LogLevel.info, '固件配置：引脚 $pinsText，驱动 id 0x'
-            '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}');
+      } else if (byCode == null) {
+        addLog(
+          LogLevel.warning,
+          '固件上报的驱动 id 0x'
+          '${config.driver.toRadixString(16).toUpperCase().padLeft(2, '0')}'
+          ' 不在已知列表里，请到设置页手动选择驱动',
+        );
       }
       notifyListeners();
       return;
@@ -698,8 +793,9 @@ class AppState extends ChangeNotifier {
     }
     addLog(
       LogLevel.warning,
-      '固件始终没推配置通知：引脚与驱动未知，可以在「设备连接」页手动选驱动。',
+      '固件始终没推配置通知：引脚与驱动未知，请到设置页手动确认驱动。',
     );
+    notifyListeners();
   }
 
   /// 在 [timeout] 内轮询等待配置通知到达。
@@ -740,6 +836,45 @@ class AppState extends ChangeNotifier {
     _adapterStatusText = await _ble.describeAdapterStatus();
     notifyListeners();
   }
+
+  /// 申请蓝牙运行时权限，返回是否已获得（启动时的权限检查用）。
+  ///
+  /// 与 [requestBlePermission] 的区别：这里不写日志（启动阶段日志面板还是空的），
+  /// 结果交给界面自己展示；同时顺手把蓝牙子系统状态刷一次，供首页显示。
+  Future<bool> requestPermissions() async {
+    final BlePermissionResult result = await _ble.ensurePermissions();
+    try {
+      _adapterStatusText = await _ble.describeAdapterStatus();
+    } catch (_) {
+      // 拿不到适配器状态不影响权限结果，界面会显示「未知」。
+    }
+    _permissionGranted = result.granted;
+    if (!_disposed) {
+      notifyListeners();
+    }
+    return result.granted;
+  }
+
+  /// 启动后自动做一次权限检查（只在首次启动时真正弹系统对话框）。
+  ///
+  /// 由 `EpdControllerApp` 在首帧后调用；测试可以注入 [PermissionGate] 绕开。
+  Future<void> ensurePermissionsOnce() async {
+    if (_permissionChecked) {
+      return;
+    }
+    _permissionChecked = true;
+    await requestPermissions();
+  }
+
+  /// 重新申请权限（用户点了横幅上的「重新申请」）。
+  Future<bool> retryPermissions() async {
+    _permissionChecked = true;
+    return requestPermissions();
+  }
+
+  /// 权限是否已被拒绝（界面据此显示提醒横幅）。
+  bool get permissionDenied =>
+      _permissionChecked && _permissionGranted == false;
 
   /// 发一条 INIT 探测链路是否真的可写（诊断页用）。
   Future<void> sendDiagnosticInit() async {
@@ -984,6 +1119,34 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 切换驱动选择方式。
+  ///
+  /// 切到手动后，固件再上报驱动号也不会覆盖用户的选择；切回自动时立即按
+  /// 已收到的配置通知（如果有）同步一次。
+  void setDriverMode(DriverSelectionMode mode) {
+    if (mode == _driverMode) {
+      return;
+    }
+    _driverMode = mode;
+    addLog(
+      LogLevel.info,
+      mode == DriverSelectionMode.auto
+          ? '驱动选择：自动（按固件上报匹配）'
+          : '驱动选择：手动（忽略固件上报，使用手动选定的驱动）',
+    );
+    final EpdConfig? config = _config;
+    if (mode == DriverSelectionMode.auto && config != null) {
+      final EpdDriver? byCode = driverByCode(config.driver);
+      if (byCode != null && byCode.id != _driver.id) {
+        _driver = byCode;
+        _resampleSource();
+        addLog(LogLevel.info, '按固件上报的驱动同步为 ${byCode.label}');
+      }
+    }
+    _persistSettings();
+    notifyListeners();
+  }
+
   void setAlgorithm(DitherAlgorithm algorithm) {
     if (algorithm == _algorithm) {
       return;
@@ -1014,13 +1177,14 @@ class AppState extends ChangeNotifier {
       return;
     }
     _mtu = clamped;
+    _persistSettings();
     notifyListeners();
   }
 
-  /// 分块档位：稳妥 / 快速 / 极限 / 自定义。
+  /// 分块档位：稳定 / 正常 / 快速 / 最大 / 自定义。
   TransferSpeed get speed => _speed;
 
-  /// 切换分块档位。切到自定义时，块大小由 MTU 滑块推算。
+  /// 切换分块档位。切到自定义时使用 [customChunkBytes]。
   void setSpeed(TransferSpeed value) {
     if (value == _speed) {
       return;
@@ -1187,12 +1351,16 @@ class AppState extends ChangeNotifier {
         'version': kSettingsVersion,
         'themeMode': _themeMode.name,
         'driverId': _driver.id,
+        'driverMode': _driverMode.name,
         'speed': _speed.name,
         'customChunkBytes': _customChunkBytes,
         'interleavedCount': _interleavedCount,
         'interleavedOverride': _interleavedCountOverride,
         'rleSupported': _rleSupported,
         'verboseTransfers': _verboseTransfers,
+        'lastDeviceId': _lastDeviceId,
+        'lastDeviceName': _lastDeviceName,
+        'driverWarningMuted': _driverWarningMuted,
       };
 
   /// 把当前设置写出去（异步、失败只记日志，不影响使用）。
@@ -1266,6 +1434,31 @@ class AppState extends ChangeNotifier {
     final Object? verboseTransfers = data['verboseTransfers'];
     if (verboseTransfers is bool) {
       _verboseTransfers = verboseTransfers;
+    }
+
+    final Object? driverModeName = data['driverMode'];
+    if (driverModeName is String) {
+      for (final DriverSelectionMode candidate in DriverSelectionMode.values) {
+        if (candidate.name == driverModeName) {
+          _driverMode = candidate;
+          break;
+        }
+      }
+    }
+
+    final Object? lastDeviceId = data['lastDeviceId'];
+    if (lastDeviceId is String && lastDeviceId.isNotEmpty) {
+      _lastDeviceId = lastDeviceId;
+    }
+
+    final Object? lastDeviceName = data['lastDeviceName'];
+    if (lastDeviceName is String && lastDeviceName.isNotEmpty) {
+      _lastDeviceName = lastDeviceName;
+    }
+
+    final Object? driverWarningMuted = data['driverWarningMuted'];
+    if (driverWarningMuted is bool) {
+      _driverWarningMuted = driverWarningMuted;
     }
 
     if (_disposed) {
