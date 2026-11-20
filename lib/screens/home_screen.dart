@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/connection_status_card.dart';
 import '../widgets/image_preview.dart';
+import 'diagnostics_screen.dart' show describeRssi;
 import 'logs_screen.dart';
 import 'permission_screen.dart';
 import 'releases_screen.dart';
@@ -24,9 +25,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _autoExpandApplied = false;
 
+  /// 上一次看到的连接状态，用来在「刚连上」时自动收起扫描区。
+  bool _wasConnected = false;
+
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
+    // 连上之后自动收起扫描区；用户点过折叠头就以用户的意愿为准。
+    if (state.isConnected && !_wasConnected) {
+      _wasConnected = true;
+      _expandedOverride = false;
+    } else if (!state.isConnected) {
+      _wasConnected = false;
+      _expandedOverride = null;
+    }
     final bool expanded = _expandedOverride ?? !state.isConnected;
     if (!_autoExpandApplied) {
       _autoExpandApplied = true;
@@ -203,7 +215,7 @@ class _ScanSection extends StatelessWidget {
                   Text(
                     state.devices.isEmpty
                         ? (expanded ? '点此收起' : '点此展开')
-                        : '${state.devices.length} 台',
+                        : '扫描到 ${state.devices.length} 个设备',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -363,6 +375,14 @@ class _DeviceInfoSection extends StatelessWidget {
             value: state.connectedDevice?.name ?? '—',
           ),
           InfoRow(label: '固件版本', value: firmware, monospace: true),
+          InfoRow(
+            label: '信号强度',
+            value: state.isConnected
+                ? (state.liveRssi == null
+                    ? '读取中 …'
+                    : '${state.liveRssi} dBm（${describeRssi(state.liveRssi!)}）')
+                : '—',
+          ),
           InfoRow(
             label: '驱动',
             value: '0x${state.driver.id.toUpperCase()} · ${state.driver.controller}',

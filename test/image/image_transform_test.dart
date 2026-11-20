@@ -131,7 +131,7 @@ void main() {
       expect(pixelAt(cropped, 4, 4), <int>[255, 255, 255]);
     });
 
-    test('裁剪矩形超出源图时按边缘色延展，不抛异常', () {
+    test('裁剪矩形超出源图时按填充色补齐（默认白）', () {
       final RgbaImage source = buildImage(2, 2, (int x, int y) {
         return x == 0 && y == 0 ? <int>[0, 0, 255] : <int>[9, 9, 9];
       });
@@ -146,10 +146,55 @@ void main() {
       );
       expect(cropped.width, 8);
       expect(cropped.height, 8);
-      // 左上角对应源图左上的那一个蓝点（被延展）。
-      expect(pixelAt(cropped, 0, 0), <int>[0, 0, 255]);
-      // 右上角对应源图右上（灰）。
-      expect(pixelAt(cropped, 7, 0), <int>[9, 9, 9]);
+      // 左上角落在源图之外，补白。
+      expect(pixelAt(cropped, 0, 0), <int>[255, 255, 255]);
+      // 中间那点落在源图内，仍然是源图的颜色。
+      expect(pixelAt(cropped, 3, 3), <int>[0, 0, 255]);
+      // 右下角在源图之外，补白。
+      expect(pixelAt(cropped, 7, 7), <int>[255, 255, 255]);
+    });
+
+    test('可以指定补黑', () {
+      final RgbaImage source = buildImage(2, 2, (int x, int y) {
+        return <int>[200, 200, 200];
+      });
+      final RgbaImage cropped = cropScaled(
+        source: source,
+        left: -4,
+        top: -4,
+        width: 12,
+        height: 12,
+        outWidth: 8,
+        outHeight: 8,
+        fill: CropFill.black,
+      );
+      expect(pixelAt(cropped, 0, 0), <int>[0, 0, 0]);
+      expect(pixelAt(cropped, 7, 7), <int>[0, 0, 0]);
+      expect(pixelAt(cropped, 3, 3), <int>[200, 200, 200]);
+    });
+
+    test('cropRectFitsInside 能分辨有没有留空', () {
+      final RgbaImage source = buildImage(10, 10, (int x, int y) => <int>[0, 0, 0]);
+      expect(
+        cropRectFitsInside(
+          source: source,
+          left: 0,
+          top: 0,
+          width: 10,
+          height: 10,
+        ),
+        isTrue,
+      );
+      expect(
+        cropRectFitsInside(
+          source: source,
+          left: -1,
+          top: 0,
+          width: 10,
+          height: 10,
+        ),
+        isFalse,
+      );
     });
 
     test('参数非法抛参数错误', () {

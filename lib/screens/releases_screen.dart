@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/app_info.dart';
 import '../services/update_checker.dart';
+import '../widgets/app_info_card.dart';
 import '../widgets/common.dart';
 import 'logs_screen.dart';
 
@@ -22,8 +22,7 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
   UpdateCheckResult? _result;
   bool _checking = false;
 
-  /// 作者名 → 个人主页。界面上只显示名字，链接藏在点击里。
-  static const String _authorUrl = 'https://github.com/Yuzgaf33tref6';
+
 
   @override
   Widget build(BuildContext context) {
@@ -33,45 +32,7 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         children: <Widget>[
-          SectionCard(
-            title: AppVersion.appName,
-            icon: Icons.auto_stories_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                InfoRow(label: '版本', value: AppVersion.fullVersion),
-                InfoRow(
-                  label: '作者',
-                  value: AppVersion.authors,
-                  onTap: () => _confirmOpen(context, _authorUrl, '作者主页'),
-                  onCopy: (String v) => _copy(context, v),
-                ),
-                _LinkRow(
-                  label: '仓库',
-                  url: AppVersion.repoUrl,
-                  onOpen: () => _confirmOpen(context, AppVersion.repoUrl, '项目仓库'),
-                  onCopy: () => _copy(context, AppVersion.repoUrl),
-                ),
-                _LinkRow(
-                  label: '固件',
-                  url: AppVersion.upstreamUrl,
-                  onOpen: () =>
-                      _confirmOpen(context, AppVersion.upstreamUrl, '上游固件项目'),
-                  onCopy: () => _copy(context, AppVersion.upstreamUrl),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '把 EPD-nRF5 的 Web 上位机搬到 Android：通过蓝牙（BLE）给墨水屏'
-                  '同步时间、清屏、传图。图像链路与 web 版逐字节对拍，'
-                  '抖动、位打包、传图分块全部一致。',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.55,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const AppInfoCard(showActions: false),
           const SizedBox(height: 12),
           SectionCard(
             title: '检查更新',
@@ -123,55 +84,6 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
         ],
       ),
     );
-  }
-
-  /// 把链接复制到剪贴板，并用 SnackBar 告诉用户复制了什么。
-  Future<void> _copy(BuildContext context, String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('已复制：$text'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  /// 打开链接前先确认一次，避免误触跳走。
-  Future<void> _confirmOpen(
-    BuildContext context,
-    String url,
-    String title,
-  ) async {
-    final bool? ok = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text('打开$title？'),
-        content: SelectableText(
-          url,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('复制链接'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-    if (!context.mounted) {
-      return;
-    }
-    if (ok == true) {
-      await _copy(context, url);
-    }
   }
 
   List<Widget> _buildResult(BuildContext context, UpdateCheckResult result) {
@@ -261,7 +173,7 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FilledButton.icon(
-                    onPressed: () => _copy(context, result.releaseUrl!),
+                    onPressed: () => copyToClipboard(context, result.releaseUrl!),
                     icon: const Icon(Icons.copy_all, size: 16),
                     label: const Text('复制下载页链接'),
                   ),
@@ -309,41 +221,3 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
   }
 }
 
-/// 带「打开」与「复制」两个图标按钮的链接行。
-///
-/// 链接用等宽字体自动折行，两个按钮固定在最右侧，保证多行时也对得齐。
-class _LinkRow extends StatelessWidget {
-  const _LinkRow({
-    required this.label,
-    required this.url,
-    required this.onOpen,
-    required this.onCopy,
-  });
-
-  final String label;
-  final String url;
-  final VoidCallback onOpen;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    return InfoRow(
-      label: label,
-      value: url,
-      monospace: true,
-      onTap: onOpen,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          IconButton(
-            tooltip: '复制链接',
-            visualDensity: VisualDensity.compact,
-            iconSize: 18,
-            onPressed: onCopy,
-            icon: const Icon(Icons.copy_outlined),
-          ),
-        ],
-      ),
-    );
-  }
-}

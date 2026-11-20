@@ -173,7 +173,9 @@ void main() {
     await switchTab(tester, 2);
     await tapAfterScroll(tester, find.text('蓝牙诊断'));
     expect(find.text('链路状态'), findsOneWidget);
-    expect(find.textContaining('还没有收到通知'), findsOneWidget);
+    // 未连接时信号强度显示占位符，且「刷新信号」不可点。
+    expect(find.text('信号'), findsOneWidget);
+    expect(find.text('刷新信号'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('设置'), findsWidgets);

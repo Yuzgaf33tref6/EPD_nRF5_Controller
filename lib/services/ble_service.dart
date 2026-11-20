@@ -109,6 +109,12 @@ abstract class EpdBleService {
   /// 请求 MTU，返回实际协商到的值。
   Future<int> requestMtu(int mtu);
 
+  /// 读一次当前链路的信号强度（dBm）。未连接或读取失败返回 null。
+  ///
+  /// 连接期间链路质量会变，扫描时拿到的 rssi 只是连上那一刻的值，
+  /// 想看实时的就调这个。
+  Future<int?> readRssi();
+
   /// 往命令特征写一条完整负载（已含命令字）。
   Future<void> write(Uint8List payload, {bool withResponse = true});
 
@@ -477,6 +483,19 @@ class ReactiveBleService implements EpdBleService {
       throw StateError('未连接设备，无法协商 MTU');
     }
     return _ble.requestMtu(deviceId: deviceId, mtu: mtu);
+  }
+
+  @override
+  Future<int?> readRssi() async {
+    final String? deviceId = _deviceId;
+    if (deviceId == null || !_isConnected) {
+      return null;
+    }
+    try {
+      return await _ble.readRssi(deviceId);
+    } catch (error) {
+      return null;
+    }
   }
 
   @override

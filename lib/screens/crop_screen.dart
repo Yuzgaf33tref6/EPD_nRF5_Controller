@@ -48,6 +48,9 @@ class _CropScreenState extends State<CropScreen> {
   String? _error;
   Size _viewSize = Size.zero;
 
+  /// 超出源图的部分填什么色。默认白（与墨水屏的「纸」一致）。
+  CropFill _fill = CropFill.white;
+
   @override
   void initState() {
     super.initState();
@@ -191,6 +194,7 @@ class _CropScreenState extends State<CropScreen> {
         height: rect.height,
         outWidth: widget.canvasWidth,
         outHeight: widget.canvasHeight,
+        fill: _fill,
       );
       if (!mounted) {
         return;
@@ -249,9 +253,12 @@ class _CropScreenState extends State<CropScreen> {
               children: <Widget>[
                 Text(
                   '拖动平移，双指或滚轮缩放（0.1~5 倍）；方向不对可以点右上角旋转 90°。'
-                  '裁剪结果会缩放到 ${widget.canvasWidth}×${widget.canvasHeight}。',
+                  '裁剪结果会缩放到 ${widget.canvasWidth}×${widget.canvasHeight}，'
+                  '图片盖不满画布的地方按下面的填充色补齐。',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                const SizedBox(height: 12),
+                _buildFillPicker(context),
                 const SizedBox(height: 8),
                 Row(
                   children: <Widget>[
@@ -283,8 +290,31 @@ class _CropScreenState extends State<CropScreen> {
     );
   }
 
-  Widget _buildView(Size viewSize) {
-    final ui.Image? preview = _preview;
+  /// 留空填充色选择器。
+  Widget _buildFillPicker(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Row(
+      children: <Widget>[
+        Text('留空填充', style: theme.textTheme.bodyMedium),
+        const SizedBox(width: 12),
+        SegmentedButton<CropFill>(
+          segments: const <ButtonSegment<CropFill>>[
+            ButtonSegment<CropFill>(value: CropFill.white, label: Text('白')),
+            ButtonSegment<CropFill>(value: CropFill.black, label: Text('黑')),
+          ],
+          selected: <CropFill>{_fill},
+          showSelectedIcon: false,
+          onSelectionChanged: _busy
+              ? null
+              : (Set<CropFill> selection) {
+                  setState(() => _fill = selection.first);
+                },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildView(Size viewSize) {    final ui.Image? preview = _preview;
     if (preview == null) {
       return Center(
         child: _error == null
@@ -312,6 +342,9 @@ class _CropScreenState extends State<CropScreen> {
               zoom: _zoom,
               panX: _panX,
               panY: _panY,
+              fillColor: _fill == CropFill.white
+                  ? const Color(0xFFFFFFFF)
+                  : const Color(0xFF000000),
               lineColor: Theme.of(context).colorScheme.primary,
             ),
             size: viewSize,
@@ -338,6 +371,9 @@ class _CropScreenState extends State<CropScreen> {
 }
 
 /// 把裁剪框内的源图部分画到视口里，并叠一层取景框。
+///
+/// 超出源图的部分按 [fillColor] 填平，与最终「完成」时 [cropScaled] 的填充色一致，
+/// 保证预览就是结果。
 class _CropPainter extends CustomPainter {
   _CropPainter({
     required this.preview,
@@ -346,6 +382,7 @@ class _CropPainter extends CustomPainter {
     required this.zoom,
     required this.panX,
     required this.panY,
+    required this.fillColor,
     required this.lineColor,
   });
 
@@ -355,6 +392,7 @@ class _CropPainter extends CustomPainter {
   final double zoom;
   final double panX;
   final double panY;
+  final Color fillColor;
   final Color lineColor;
 
   @override
@@ -380,12 +418,38 @@ class _CropPainter extends CustomPainter {
 
     canvas.save();
     canvas.clipRect(dstRect);
-    canvas.drawImageRect(
-      preview,
-      srcRect,
-      dstRect,
-      Paint()..filterQuality = FilterQuality.medium,
-    );
+
+    // 先铺满填充色：源图盖不到的地方保持这个颜色，就是最终会补的底色。
+    canvas.drawRect(dstRect, Paint()..color = fillColor);
+
+    // 再算源图矩形在视口里实际覆盖的区域，只画这块（避免把边缘像素拉伸出硬边）。
+    // 源图矩形在源图坐标下 = (0,0)~(sourceSize)；把裁剪矩形映射回视口即可。
+    final double viewLeft = (0 - rect.left) / rect.width * size.width;    final double viewTop = (0 - rect.top) / rect.height * size.height;
+    final double viewRight =
+        (sourceSize.width - rect.left) / rect.width * size.width;
+    final double viewBottom =
+        (sourceSize.height - rect.top) / rect.height * size.height;
+    final Rect visibleRect = Rect.fromLTRB(viewLeft, viewTop, viewRight, viewBottom)
+        .intersect(dstRect);
+
+    if (visibleRect.width > 0 && visibleRect.height > 0) {
+      // visibleRect 对应源图上的哪一块，再换算成预览图坐标。
+      final double srcLeft = (visibleRect.left / size.width) * rect.width +
+          rect.left;
+      final double srcTop =
+          (visibleRect.top / size.height) * rect.height + rect.top;
+      final double srcRight =
+          (visibleRect.right / size.width) * rect.width + rect.left;
+      final double srcBottom =
+          (visibleRect.bottom / size.height) * rect.height + rect.top;
+      canvas.drawImageRect(
+        preview,
+        Rect.fromLTRB(srcLeft * sx, srcTop * sy, srcRight * sx, srcBottom * sy),
+        visibleRect,
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+    }
+
     canvas.restore();
 
     final Paint border = Paint()
@@ -412,6 +476,7 @@ class _CropPainter extends CustomPainter {
     return oldDelegate.preview != preview ||
         oldDelegate.zoom != zoom ||
         oldDelegate.panX != panX ||
-        oldDelegate.panY != panY;
+        oldDelegate.panY != panY ||
+        oldDelegate.fillColor != fillColor;
   }
 }

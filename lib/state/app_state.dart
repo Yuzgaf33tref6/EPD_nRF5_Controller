@@ -127,6 +127,10 @@ class AppState extends ChangeNotifier {
   List<EpdBleDevice> _devices = const <EpdBleDevice>[];
   EpdBleDevice? _connected;
   int? _firmwareVersion;
+
+  /// 连接后实时读到的信号强度（dBm）。扫描时的值是连上那一刻的旧值。
+  int? _liveRssi;
+  bool _readingRssi = false;
   EpdConfig? _config;
   StreamSubscription<Uint8List>? _notificationSubscription;
   StreamSubscription<bool>? _connectionChangeSubscription;
@@ -289,6 +293,12 @@ class AppState extends ChangeNotifier {
 
   /// 已成功写入的负载条数（诊断页用来确认链路真的通了）。
   int get writesSent => _writesSent;
+
+  /// 连接后实时读到的信号强度（dBm）。还没读过时退回扫描时的值。
+  int? get liveRssi => _liveRssi ?? _connected?.rssi;
+
+  /// 是否正在读信号强度（按钮转圈用）。
+  bool get isReadingRssi => _readingRssi;
 
   /// 最近收到的通知原文（诊断页用）。
   List<String> get notificationLog =>
@@ -601,6 +611,8 @@ class AppState extends ChangeNotifier {
     );
 
     _firmwareVersion = await _ble.readFirmwareVersion();
+    // 新链路读到的第一个实测信号强度（读到之前界面显示扫描时的旧值）。
+    _liveRssi = await _ble.readRssi();
     // RLE 只认固件在通知里明确说的 `rle=1`（web 版就是这么判的，见
     // `html/js/main.js:404`）。以前这里按版本号猜「>= 0x16 就支持 RLE」，
     // 结果在 0x19 的固件上打开了 RLE，而该固件并不支持 —— 屏幕刷出来
@@ -651,6 +663,7 @@ class AppState extends ChangeNotifier {
     final String name = device.name;
     _connected = null;
     _firmwareVersion = null;
+    _liveRssi = null;
     _config = null;
     _rleSupported = false;
     _sawConfigNotification = false;
@@ -714,6 +727,7 @@ class AppState extends ChangeNotifier {
     await _ble.disconnect();
     _connected = null;
     _firmwareVersion = null;
+    _liveRssi = null;
     _config = null;
     _rleSupported = false;
     _sawConfigNotification = false;
@@ -847,6 +861,29 @@ class AppState extends ChangeNotifier {
   Future<void> refreshDiagnostics() async {
     _adapterStatusText = await _ble.describeAdapterStatus();
     addLog(LogLevel.info, '蓝牙状态：$_adapterStatusText');
+    notifyListeners();
+  }
+
+  /// 读一次当前链路的信号强度（诊断页 / 设备信息卡用）。
+  ///
+  /// 信号强度是瞬时的，读完不缓存成「常量」——下次进页面或点刷新再读。
+  Future<void> refreshRssi() async {
+    if (!isConnected || _readingRssi) {
+      return;
+    }
+    _readingRssi = true;
+    notifyListeners();
+    try {
+      final int? value = await _ble.readRssi();
+      if (value != null) {
+        _liveRssi = value;
+      }
+    } finally {
+      _readingRssi = false;
+    }
+    if (_disposed) {
+      return;
+    }
     notifyListeners();
   }
 

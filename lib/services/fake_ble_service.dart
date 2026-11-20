@@ -174,6 +174,17 @@ class FakeBleService implements EpdBleService {
     return mtu.clamp(23, 517);
   }
 
+  /// 模拟的链路信号强度，测试里可以改它验证刷新。
+  int fakeRssi = -52;
+
+  @override
+  Future<int?> readRssi() async {
+    if (!_isConnected) {
+      return null;
+    }
+    return fakeRssi;
+  }
+
   @override
   Future<void> write(Uint8List payload, {bool withResponse = true}) async {
     if (!_isConnected) {

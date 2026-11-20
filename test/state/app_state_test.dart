@@ -104,6 +104,25 @@ void main() {
       expect(state.config, isNotNull);
       // 连接流程里自动发了一条 INIT。
       expect(state.writesSent, 1);
+      // 连上时顺手读了一次真实的信号强度。
+      expect(state.liveRssi, isNotNull);
+    });
+
+    test('刷新信号强度会更新 liveRssi，断开后清空', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      await state.scan();
+      await state.connect(state.devices.first);
+      await settle();
+
+      ble.fakeRssi = -77;
+      await state.refreshRssi();
+      expect(state.liveRssi, -77);
+      expect(state.isReadingRssi, isFalse);
+
+      await state.disconnect();
+      await settle();
+      expect(state.liveRssi, isNull);
     });
 
     test('连接后自动发 INIT，固件回配置通知与 MTU 文本通知', () async {

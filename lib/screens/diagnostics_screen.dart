@@ -5,8 +5,26 @@ import '../widgets/common.dart';
 import 'permission_screen.dart';
 
 /// 蓝牙诊断页：链路状态、诊断动作、原始通知。系统权限集中在「权限检查」页。
-class DiagnosticsScreen extends StatelessWidget {
+///
+/// 信号强度是瞬时值：进页面自动读一次，之后点「刷新信号」再读。
+class DiagnosticsScreen extends StatefulWidget {
   const DiagnosticsScreen({super.key});
+
+  @override
+  State<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
+}
+
+class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final AppState? state = AppStateScope.maybeOf(context);
+      if (state != null && state.isConnected) {
+        state.refreshRssi();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +49,7 @@ class DiagnosticsScreen extends StatelessWidget {
                       : (state.isConnecting ? '连接中 …' : '未连接'),
                 ),
                 InfoRow(label: '固件', value: state.firmwareVersionText),
+                InfoRow(label: '信号', value: _rssiText(state)),
                 InfoRow(label: '引脚', value: state.pinsText),
                 InfoRow(
                   label: 'MTU',
@@ -55,6 +74,12 @@ class DiagnosticsScreen extends StatelessWidget {
                     OutlinedButton(
                       onPressed: state.refreshDiagnostics,
                       child: const Text('刷新蓝牙状态'),
+                    ),
+                    OutlinedButton(
+                      onPressed: state.isConnected && !state.isReadingRssi
+                          ? state.refreshRssi
+                          : null,
+                      child: Text(state.isReadingRssi ? '读取中 …' : '刷新信号'),
                     ),
                     OutlinedButton(
                       onPressed: () => Navigator.of(context).push(
@@ -112,4 +137,32 @@ class DiagnosticsScreen extends StatelessWidget {
       ),
     );
   }
+
+  /// 信号强度展示：未连接就是 `-`，连上后附带强弱判读。
+  String _rssiText(AppState state) {
+    if (!state.isConnected) {
+      return '-';
+    }
+    final int? rssi = state.liveRssi;
+    if (rssi == null) {
+      return '读取中 …';
+    }
+    return '$rssi dBm（${describeRssi(rssi)}）';
+  }
+}
+
+/// 把 dBm 翻译成好懂的话。
+///
+/// 门限参考常见 BLE 经验值：> -60 很近、-60~-75 正常、-75~-85 偏弱、再低就容易断。
+String describeRssi(int rssi) {
+  if (rssi >= -60) {
+    return '很近';
+  }
+  if (rssi >= -75) {
+    return '正常';
+  }
+  if (rssi >= -85) {
+    return '偏弱';
+  }
+  return '很弱';
 }

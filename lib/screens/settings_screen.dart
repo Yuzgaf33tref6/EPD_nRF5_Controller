@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../devices/epd_driver.dart';
 import '../models/transfer_speed.dart';
-import '../services/app_info.dart';
 import '../state/app_state.dart';
+import '../widgets/app_info_card.dart';
 import '../widgets/common.dart';
 import 'diagnostics_screen.dart';
-import 'logs_screen.dart';
 import 'permission_screen.dart';
 import 'plane_check_screen.dart';
-import 'releases_screen.dart';
 import 'solid_color_screen.dart';
 
 /// 设置页：应用 / 传输 / 驱动 / 诊断 / 关于 五组。
@@ -36,7 +34,7 @@ class SettingsScreen extends StatelessWidget {
                 const GroupHeader(title: '诊断'),
                 _DiagnosticsGroup(state: state),
                 const GroupHeader(title: '关于'),
-                _AboutGroup(state: state),
+                _AboutGroup(),
               ],
             ),
           ),
@@ -102,7 +100,7 @@ class _TransferGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final int? rssi = state.connectedDevice?.rssi;
+    final int? rssi = state.isConnected ? state.liveRssi : null;
     return Column(
       children: <Widget>[
         SectionCard(
@@ -120,8 +118,7 @@ class _TransferGroup extends StatelessWidget {
                 label: '写请求',
                 value: '${state.writeMtu - 2} 字节有效负载上限',
               ),
-              if (rssi != null) InfoRow(label: '信号', value: '$rssi dBm'),
-              const SizedBox(height: 6),
+              if (rssi != null) InfoRow(label: '信号', value: '$rssi dBm'),              const SizedBox(height: 6),
               Text(
                 '说明：固件通知里的 mtu=244 是「特征值最大长度」，即 GATT MTU - 3；'
                 'App 连接时主动协商到 247，真机上一般就是 247。'
@@ -422,76 +419,12 @@ class _DiagnosticsGroup extends StatelessWidget {
 }
 
 class _AboutGroup extends StatelessWidget {
-  const _AboutGroup({required this.state});
-
-  final AppState state;
+  const _AboutGroup();
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return SectionCard(
-      title: '软件信息',
-      icon: Icons.info_outline,
-      dense: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          InfoRow(label: '名称', value: AppVersion.appName),
-          InfoRow(label: '版本', value: AppVersion.fullVersion),
-          InfoRow(label: '作者', value: AppVersion.authors),
-          InfoRow(label: '仓库', value: AppVersion.repoUrl, labelWidth: 56),
-          InfoRow(
-            label: '固件',
-            value: AppVersion.upstreamUrl,
-            labelWidth: 56,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '版本说明：v${AppVersion.version} 是一次界面重构 —— 底部导航拆成'
-            '「首页 / 发送 / 设置」，连接状态与快捷操作集中在首页，'
-            '图像发送独立成页以减少预览开销，新增权限自动检查、'
-            '驱动选择模式、更新检查与更新日志。',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const ReleaseNotesScreen(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: const Text('更新日志'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const ReleasesScreen(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                  label: const Text('检查更新'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '许可证：GPL-3.0 · 固件与 Web 上位机来自 tsl0922/EPD-nRF5',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
+    // 与「关于与更新」页共用同一个区块，避免两处文案/字段漂移。
+    return const AppInfoCard(showActions: true);
   }
 }
+
