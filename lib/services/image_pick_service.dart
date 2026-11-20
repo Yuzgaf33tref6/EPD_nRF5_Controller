@@ -52,9 +52,13 @@ class GalleryImagePickService implements ImagePickService {
 
   final ImagePicker _picker;
 
-  /// 墨水屏最大也就 800x480，源图超过 2400 像素没有意义，反而更慢更吃内存，
-  /// 所以在选图阶段就让系统先缩小一次。
-  static const double _maxSourceEdge = 2400;
+  /// 选图阶段让系统先缩小一次的上限。
+  ///
+  /// 墨水屏最大也就 800x480，但裁切时用户会放大细看，所以留足余量：
+  /// 4096 长边在 400×300 的画布上放大到 5 倍仍有余量，同时把内存压在
+  /// 64MB 以内（4096×3072×4 ≈ 48MB），不会因为一张手机原图（约 4000 万像素、
+  /// 160MB）直接把进程顶掉。
+  static const double _maxSourceEdge = 4096;
 
   @override
   Future<RgbaImage?> pickFromGallery() async {

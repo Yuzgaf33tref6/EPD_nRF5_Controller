@@ -364,7 +364,8 @@ String describeSleepSafety(SleepSafety safety, int? wakeupPin) {
       return '已收到配置，唤醒引脚为 0x${wakeupPin!.toRadixString(16).toUpperCase().padLeft(2, '0')}，'
           '发这条指令后按一下墨水屏的唤醒键即可重新唤醒。';
     case SleepSafety.unsafe:
-      return '配置里的唤醒引脚是 0xFF（未配置），发送后设备将**无法唤醒**，'
+      // 不要在这里写 markdown：界面上的 Text 不解析 `**`，会原样把星号显示出来。
+      return '配置里的唤醒引脚是 0xFF（未配置），发送后设备将无法唤醒，'
           '只能重新刷固件。已禁用这条指令。';
     case SleepSafety.unknown:
       return '还没收到固件配置，无法确认唤醒引脚。如果设备没配置唤醒引脚，'

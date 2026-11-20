@@ -99,7 +99,7 @@ void main() {
     await pumpApp(tester);
     await switchTab(tester, 1);
     expect(find.text('设备指令'), findsOneWidget);
-    expect(find.text('同步时间'), findsOneWidget);
+    expect(find.textContaining('同步时间'), findsOneWidget);
     await scrollTo(tester, find.text('图像发送'));
     expect(find.text('图像发送'), findsOneWidget);
   });
@@ -228,10 +228,13 @@ void main() {
   testWidgets('未连接时发送页的设备指令按钮禁用', (WidgetTester tester) async {
     await pumpApp(tester);
     await switchTab(tester, 1);
-    await scrollTo(tester, find.widgetWithText(OutlinedButton, '清屏'));
-    final OutlinedButton clearButton = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, '清屏'),
+    // 按钮文案带指令编号（0x02 清屏），用 textContaining 定位更稳。
+    final Finder clearFinder = find.ancestor(
+      of: find.textContaining('清屏'),
+      matching: find.byType(OutlinedButton),
     );
+    await scrollTo(tester, clearFinder);
+    final OutlinedButton clearButton = tester.widget<OutlinedButton>(clearFinder);
     expect(clearButton.onPressed, isNull);
   });
 }

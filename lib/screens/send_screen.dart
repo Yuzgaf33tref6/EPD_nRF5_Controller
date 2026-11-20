@@ -43,7 +43,7 @@ class SendScreen extends StatelessWidget {
                                   ? () => state.syncTime(clockMode: false)
                                   : null,
                               icon: const Icon(Icons.event, size: 18),
-                              label: const Text('同步时间'),
+                              label: const Text('0x20 同步时间'),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -53,7 +53,7 @@ class SendScreen extends StatelessWidget {
                                   ? () => state.syncTime(clockMode: true)
                                   : null,
                               icon: const Icon(Icons.schedule, size: 18),
-                              label: const Text('时钟模式'),
+                              label: const Text('0x20 时钟模式'),
                             ),
                           ),
                         ],
@@ -67,7 +67,7 @@ class SendScreen extends StatelessWidget {
                                   connected ? () => state.clearScreen() : null,
                               icon: const Icon(Icons.cleaning_services_outlined,
                                   size: 18),
-                              label: const Text('清屏'),
+                              label: const Text('0x02 清屏'),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -76,7 +76,7 @@ class SendScreen extends StatelessWidget {
                               onPressed:
                                   connected ? () => state.refreshScreen() : null,
                               icon: const Icon(Icons.refresh, size: 18),
-                              label: const Text('刷新'),
+                              label: const Text('0x05 刷新'),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -85,7 +85,7 @@ class SendScreen extends StatelessWidget {
                               onPressed:
                                   connected ? () => state.sleepDevice() : null,
                               icon: const Icon(Icons.bedtime_outlined, size: 18),
-                              label: const Text('睡眠'),
+                              label: const Text('0x06 睡眠'),
                             ),
                           ),
                         ],

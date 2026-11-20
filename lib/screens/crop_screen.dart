@@ -40,7 +40,10 @@ class CropScreen extends StatefulWidget {
 
 class _CropScreenState extends State<CropScreen> {
   /// 预览用的小图，避免每帧都拿几百万像素去画。
-  static const int _previewMaxEdge = 720;
+  ///
+  /// 1080 是「看得出细节」和「画得动」的平衡点：400×300 的画布在手机上放大到
+  /// 900px 宽时，取景框里大约对应源图的 1/3，1080 长边的预览还能撑住不糊。
+  static const int _previewMaxEdge = 1080;
 
   /// 当前工作图。导入图片后如果方向不对，可以在这里旋转 90°，再裁剪。
   late RgbaImage _working = widget.source;
@@ -82,10 +85,11 @@ class _CropScreenState extends State<CropScreen> {
       final ui.Image? oldPreview = _preview;
       setState(() {
         _preview = image;
-        _previewSize = Size(
-          _working.width.toDouble(),
-          _working.height.toDouble(),
-        );
+        // 注意：这里必须存**预览贴图自己的像素尺寸**。
+        // 之前存的是 _working 的尺寸（原图，可能 2400×1350），而贴图已经缩到
+        // 最长 1080，于是 _CropPainter 用「原图尺寸」当源矩形去采样一张小很多的
+        // 贴图 —— 只有左上角一小块有效，画面上就是「图片缩在左上、偏小三分之二」。
+        _previewSize = Size(preview.width.toDouble(), preview.height.toDouble());
       });
       oldPreview?.dispose();
     } catch (error) {
@@ -97,18 +101,19 @@ class _CropScreenState extends State<CropScreen> {
   }
 
   /// 把源图缩到预览尺寸（保持宽高比，不放大）。
+  ///
+  /// 尺寸计算走 [previewSizeForSource]，和 [_previewSize] 用的是同一份数据，
+  /// 避免「画的图」和「记录下来的尺寸」对不上。
   RgbaImage _downscaleForPreview(RgbaImage source) {
-    final int longest =
-        source.width > source.height ? source.width : source.height;
-    if (longest <= _previewMaxEdge) {
+    final CropPreviewSize size = previewSizeForSource(
+      width: source.width,
+      height: source.height,
+      maxEdge: _previewMaxEdge,
+    );
+    if (size.scale >= 1) {
       return source.clone();
     }
-    final double ratio = _previewMaxEdge / longest;
-    final int width =
-        (source.width * ratio).round().clamp(1, _previewMaxEdge).toInt();
-    final int height =
-        (source.height * ratio).round().clamp(1, _previewMaxEdge).toInt();
-    return resizeBilinear(source, width, height);
+    return resizeBilinear(source, size.width, size.height);
   }
 
   Future<ui.Image> _rgbaToUiImage(RgbaImage image) async {

@@ -177,6 +177,55 @@ CropViewRect sourceRectForView({
   );
 }
 
+/// 裁剪页预览贴图的尺寸信息。
+///
+/// 存在的意义：裁剪页同时持有两份像素 —— 工作图（原分辨率，用来真正裁剪）
+/// 和预览贴图（缩小到 [maxEdge]，只用来画到屏幕上）。**两者尺寸不同**，
+/// 画图和裁剪各自要用自己那份。曾经把工作图尺寸当成预览贴图尺寸去
+/// `drawImageRect`，画面就缩到左上角、只剩三分之一大。
+class CropPreviewSize {
+  const CropPreviewSize({
+    required this.width,
+    required this.height,
+    required this.scale,
+  });
+
+  /// 预览贴图的像素宽高。
+  final int width;
+  final int height;
+
+  /// 预览 / 原图 的比例（≤ 1）。
+  final double scale;
+
+  @override
+  String toString() => 'CropPreviewSize(${width}x$height, scale: $scale)';
+}
+
+/// 算出预览贴图应该缩到多大：长边不超过 [maxEdge]，不放大，非法输入退回 1×1。
+CropPreviewSize previewSizeForSource({
+  required int width,
+  required int height,
+  required int maxEdge,
+}) {
+  if (width <= 0 || height <= 0 || maxEdge <= 0) {
+    return const CropPreviewSize(width: 1, height: 1, scale: 1);
+  }
+  final int longest = math.max(width, height);
+  if (longest <= maxEdge) {
+    return CropPreviewSize(width: width, height: height, scale: 1);
+  }
+  final double ratio = maxEdge / longest;
+  final int previewWidth =
+      math.max(1, (width * ratio).round().clamp(1, maxEdge).toInt());
+  final int previewHeight =
+      math.max(1, (height * ratio).round().clamp(1, maxEdge).toInt());
+  return CropPreviewSize(
+    width: previewWidth,
+    height: previewHeight,
+    scale: previewWidth / width,
+  );
+}
+
 /// 裁完之后要不要让用户「转一下」。
 ///
 /// 竖图（高大于宽）铺到横屏画布上，取景框只能取到中间窄窄一条，几乎必然要把
