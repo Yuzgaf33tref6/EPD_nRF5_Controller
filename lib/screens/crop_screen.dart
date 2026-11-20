@@ -294,8 +294,9 @@ class _CropScreenState extends State<CropScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  '拖动平移，双指或滚轮缩放（1~5 倍）。取景框就是画布比例，'
-                  '框里看到什么，发到墨水屏上就是什么。',
+                  '拖动平移，双指或滚轮缩放（0.1~5 倍，可以缩到比取景框小）。'
+                  '取景框就是画布比例，框里看到什么，发到墨水屏上就是什么；'
+                  '图片盖不满的地方按下面的底色补齐。',
                   style: theme.textTheme.bodySmall,
                 ),
                 if (suggestRotate)

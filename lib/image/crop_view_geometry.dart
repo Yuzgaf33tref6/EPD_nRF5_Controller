@@ -16,8 +16,12 @@ library;
 
 import 'dart:math' as math;
 
-/// 缩放下限（沿用 web 版 `Math.max(0.1, ...)`）。
-const double kCropViewMinZoom = 1.0;
+/// 缩放下限。
+///
+/// 允许缩到 1 以下（把图缩小，四周露出底色），因为有些场景需要「把小图放到
+/// 大画布中间」而不是硬撑满。下限取 0.1 而不是 0，保证比例永远为正、
+/// 不会出现除零；上限沿用 web 版的 5 倍。
+const double kCropViewMinZoom = 0.1;
 
 /// 缩放上限（沿用 web 版 `Math.min(5, ...)`）。
 const double kCropViewMaxZoom = 5.0;
@@ -94,7 +98,7 @@ CropViewRect fitCanvasRect({
 class CropViewState {
   const CropViewState({this.zoom = 1, this.panX = 0, this.panY = 0});
 
-  /// 缩放倍率，1 = 图片刚好铺满视口。
+  /// 缩放倍率，1 = 图片刚好铺满视口；小于 1 表示缩小（四周会露出底色）。
   final double zoom;
 
   /// 平移量（屏幕像素，右/下为正）。
@@ -109,6 +113,12 @@ class CropViewState {
     );
   }
 
+  /// 把缩放夹到合法区间，平移限制在「图片仍能盖住视口」的范围内。
+  ///
+  /// 图片大于视口时按旧规则夹紧（拖不出空白，避免误操作把画面拖没）；
+  /// 图片**小于**视口时（zoom 已允许 < 1），不再强行贴边，而是允许在
+  /// 视口内自由摆放 —— 用户可能就想把小图放在画面某个位置，而不是
+  /// 永远被顶到左上角。越界量仍限制在「整张图都在视口内」这个范围。
   CropViewState clamped({
     required double imageWidth,
     required double imageHeight,
@@ -116,16 +126,31 @@ class CropViewState {
     required double viewHeight,
   }) {
     final double z = _clampZoom(zoom);
+    // cover 比例：让图片刚好铺满视口所需的缩放。
     final double cover =
         math.max(viewWidth / imageWidth, viewHeight / imageHeight) * z;
     final double displayWidth = imageWidth * cover;
     final double displayHeight = imageHeight * cover;
-    final double maxPanX = math.max(0, (displayWidth - viewWidth) / 2);
-    final double maxPanY = math.max(0, (displayHeight - viewHeight) / 2);
+
+    double limitX;
+    double limitY;
+    if (displayWidth >= viewWidth) {
+      // 图片比视口宽：只能左右拖动，露出部分被裁掉。
+      limitX = (displayWidth - viewWidth) / 2;
+    } else {
+      // 图片比视口窄：允许在视口内任意摆放（居中 → 左右各自贴边）。
+      limitX = (viewWidth - displayWidth) / 2;
+    }
+    if (displayHeight >= viewHeight) {
+      limitY = (displayHeight - viewHeight) / 2;
+    } else {
+      limitY = (viewHeight - displayHeight) / 2;
+    }
+
     return CropViewState(
       zoom: z,
-      panX: panX.clamp(-maxPanX, maxPanX).toDouble(),
-      panY: panY.clamp(-maxPanY, maxPanY).toDouble(),
+      panX: panX.clamp(-limitX, limitX).toDouble(),
+      panY: panY.clamp(-limitY, limitY).toDouble(),
     );
   }
 
@@ -154,6 +179,10 @@ CropViewRect imageDisplayRect({
 }
 
 /// 把屏幕矩形 [rect]（相对视口左上角）换算成源图像素矩形。
+///
+/// 注意：`zoom < 1`（图片缩小）时，返回的矩形会**超出源图边界**（left/top 为负，
+/// 或 right/bottom 大于图宽/图高）。这是有意的 —— [cropScaled] 会把超出部分
+/// 用填充色补齐，正好对应画面上看到的「四周露出底色」。
 CropViewRect sourceRectForView({
   required double imageWidth,
   required double imageHeight,
