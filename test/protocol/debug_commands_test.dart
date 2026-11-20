@@ -9,7 +9,9 @@ void main() {
     test('支持空格、逗号、0x 前缀和大小写', () {
       expect(parseHexPayload('0A 0B 0C'), <int>[0x0A, 0x0B, 0x0C]);
       expect(parseHexPayload('0a0b0c'), <int>[0x0A, 0x0B, 0x0C]);
-      expect(parseHexPayload('0xA, 0xb'), <int>[0x0A, 0x0B]);
+      // 每段都要写成两位：'0xA, 0xb' 去掉 0x 后会粘成 'Ab' 被当成一个字节。
+      expect(parseHexPayload('0x0A, 0x0B'), <int>[0x0A, 0x0B]);
+      expect(parseHexPayload('0a,0b'), <int>[0x0A, 0x0B]);
       expect(parseHexPayload('FF\n00'), <int>[0xFF, 0x00]);
     });
 

@@ -101,7 +101,10 @@ void main() {
       // RLE 不按版本号猜，只认固件通知里的 rle=1（web 版同此逻辑）；
       // 模拟固件在 INIT 之后回了 `mtu=20 rle=1`，所以这里是 true。
       expect(state.rleSupported, isTrue);
-      expect(state.pinsText.split(' ').length, 7);
+      // 固件推的配置通知是完整的 13 字节时的行为：
+      // 前 7 字节是 7 个引脚，第 8 个字节（index 7）是驱动号，
+      // 而 index 10 的 en_pin 会被当作额外的第 8 个引脚，所以是 8 个。
+      expect(state.pinsText.split(' ').length, 8);
       expect(state.config, isNotNull);
       // 连接流程里自动发了一条 INIT。
       expect(state.writesSent, 1);
