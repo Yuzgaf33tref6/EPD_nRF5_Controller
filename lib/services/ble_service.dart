@@ -211,34 +211,32 @@ class ReactiveBleService implements EpdBleService {
 
   @override
   Future<List<AppPermissionStatus>> checkPermissions() async {
-    // 一次问完所有权限的当前状态（不会弹窗）。
-    // 注意：`List<Permission>` 上的 `.status` 来自 permission_handler 的扩展方法，
-    // 需要显式写成 `<Permission>[...].status`；这里拆成具名列表更清楚。
-    const List<Permission> permissions = <Permission>[
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
-    ];
-    final Map<Permission, PermissionStatus> statuses = await permissions.status;
+    // 逐个问当前状态（不会弹窗）。
+    // 注意：permission_handler 的 `List<Permission>` 扩展只有 `request()`，
+    // 没有批量 `status`，所以只能一项一项 await。
+    final PermissionStatus scanStatus = await Permission.bluetoothScan.status;
+    final PermissionStatus connectStatus =
+        await Permission.bluetoothConnect.status;
+    final PermissionStatus locationStatus =
+        await Permission.locationWhenInUse.status;
 
     return <AppPermissionStatus>[
       AppPermissionStatus(
         name: '附近的设备（扫描）',
         androidName: 'BLUETOOTH_SCAN',
-        status: statuses[Permission.bluetoothScan] ?? PermissionStatus.denied,
+        status: scanStatus,
         reason: '扫描周围墨水屏需要；Android 12 起属于「附近的设备」。',
       ),
       AppPermissionStatus(
         name: '附近的设备（连接）',
         androidName: 'BLUETOOTH_CONNECT',
-        status: statuses[Permission.bluetoothConnect] ?? PermissionStatus.denied,
+        status: connectStatus,
         reason: '连接设备、读写特征值、接收通知需要。',
       ),
       AppPermissionStatus(
         name: '位置信息',
         androidName: 'ACCESS_FINE_LOCATION',
-        status: statuses[Permission.locationWhenInUse] ??
-            PermissionStatus.denied,
+        status: locationStatus,
         reason: 'Android 11 及以下扫描蓝牙必须开定位；12 起不再要求。',
       ),
     ];
