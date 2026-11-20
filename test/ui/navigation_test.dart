@@ -154,6 +154,19 @@ void main() {
     expect(find.text('设置'), findsWidgets);
   });
 
+  testWidgets('设置页 → 权限检查 → 返回', (WidgetTester tester) async {
+    await pumpApp(tester);
+    await switchTab(tester, 2);
+
+    await tapAfterScroll(tester, find.text('权限检查'));
+    expect(find.text('权限清单'), findsOneWidget);
+    expect(find.text('附近的设备（扫描）'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('设置'), findsOneWidget);
+  });
+
   testWidgets('设置页 → 蓝牙诊断 → 返回', (WidgetTester tester) async {
     await pumpApp(tester);
     await switchTab(tester, 2);

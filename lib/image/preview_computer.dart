@@ -1,0 +1,136 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+
+import 'dither.dart';
+import 'epd_color.dart';
+import 'rgba_image.dart';
+
+/// 抖动计算的入参。必须全部是「可跨 isolate 传递」的值类型。
+///
+/// 之所以不直接传 `RgbaImage` 对象：`compute` 要求入参和返回值都能在 isolate 之间
+/// 传递，实体类虽然多数情况下可以，但这里显式把 RGBA 字节拆出来传，行为更可预期，
+/// 也方便单测（无 Flutter 环境也能算）。
+@immutable
+class DitherJob {
+  const DitherJob({
+    required this.width,
+    required this.height,
+    required this.rgba,
+    required this.algorithm,
+    required this.strength,
+    required this.contrast,
+    required this.mode,
+  });
+
+  final int width;
+  final int height;
+  final Uint8List rgba;
+  final DitherAlgorithm algorithm;
+  final double strength;
+  final double contrast;
+  final EpdColorMode mode;
+
+  /// 标识这份入参的键，用来判断结果是否还有效。
+  Object get key => Object.hash(
+        width,
+        height,
+        algorithm,
+        strength,
+        contrast,
+        mode,
+        _hashBytes(rgba),
+      );
+}
+
+/// 稳定的字节哈希（FNV-1a）。不用 `Object.hashAll` 是因为它每次进程启动都不同，
+/// 不能让结果在多次调用之间比较。
+int _hashBytes(Uint8List bytes) {
+  int hash = 0x811c9dc5;
+  // 只采样，避免每次对 12 万字节全扫（采样漏判的代价只是多算一次预览）。
+  final int step = bytes.length <= 4096 ? 1 : bytes.length ~/ 4096;
+  for (int i = 0; i < bytes.length; i += step) {
+    hash ^= bytes[i];
+    hash = (hash * 0x01000193) & 0x7fffffff;
+  }
+  return hash ^ bytes.length;
+}
+
+/// 在**后台 isolate** 里算抖动预览。
+///
+/// 这是「一进预览页就卡」的正面解法：对比度 + 抖动要遍历 12 万像素、每个像素还要
+/// 跟调色板做一次 Lab 距离比较，跑在主 isolate 上必然掉帧。放到后台后，
+/// UI 线程只负责画已经转好的贴图，滑块拖动期间界面依然跟手。
+class PreviewComputer {
+  PreviewComputer();
+
+  /// 上一次的结果与它的键，用于避免重复计算。
+  RgbaImage? _lastResult;
+  Object? _lastKey;
+
+  /// 已经排队但还没开始的请求只保留最后一个（拖动滑块时中间的都不需要）。
+  DitherJob? _queued;
+  bool _running = false;
+  bool _disposed = false;
+
+  /// 结果回调。每次算完都会带结果调用一次。
+  void Function(RgbaImage image)? onResult;
+
+  /// 提交一次计算请求。相同的入参会被跳过；正在算时新请求会覆盖掉排队的那个。
+  void request(DitherJob job) {
+    if (_disposed) {
+      return;
+    }
+    final Object key = job.key;
+    if (_lastKey == key && _lastResult != null) {
+      return;
+    }
+    _queued = job;
+    if (!_running) {
+      unawaited(_pump());
+    }
+  }
+
+  Future<void> _pump() async {
+    _running = true;
+    try {
+      while (_queued != null && !_disposed) {
+        final DitherJob job = _queued!;
+        _queued = null;
+        final RgbaImage result = await compute(_runDitherJob, job);
+        if (_disposed) {
+          return;
+        }
+        _lastResult = result;
+        _lastKey = job.key;
+        onResult?.call(result);
+      }
+    } finally {
+      _running = false;
+    }
+  }
+
+  void dispose() {
+    _disposed = true;
+    _queued = null;
+    _lastResult = null;
+    _lastKey = null;
+    onResult = null;
+  }
+}
+
+/// 顶层函数，供 [compute] 在 isolate 里执行。
+RgbaImage _runDitherJob(DitherJob job) {
+  final RgbaImage image = RgbaImage(
+    job.width,
+    job.height,
+    Uint8List.fromList(job.rgba),
+  );
+  RgbaImage out = adjustContrast(image, job.contrast);
+  out = ditherImage(out, job.algorithm, job.strength, job.mode);
+  return out;
+}
+
+/// 给测试/同步场景用的直接计算版本（不开 isolate）。
+RgbaImage computeDitherJobSync(DitherJob job) => _runDitherJob(job);

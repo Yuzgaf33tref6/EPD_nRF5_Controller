@@ -7,6 +7,7 @@ import '../widgets/common.dart';
 import '../widgets/connection_status_card.dart';
 import '../widgets/image_preview.dart';
 import 'logs_screen.dart';
+import 'permission_screen.dart';
 import 'releases_screen.dart';
 
 /// 首页：连接状态大卡片 + 快捷按钮 + 折叠的设备扫描 + 应用与设备信息。
@@ -71,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   _PermissionBanner(
                     onRetry: () => state.retryPermissions(),
+                    onOpenDetail: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const PermissionScreen(),
+                      ),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -119,9 +125,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
 /// 权限被拒时的横幅提示。
 class _PermissionBanner extends StatelessWidget {
-  const _PermissionBanner({required this.onRetry});
+  const _PermissionBanner({
+    required this.onRetry,
+    required this.onOpenDetail,
+  });
 
   final VoidCallback onRetry;
+
+  /// 打开「权限检查」页，看具体是哪条权限没给。
+  final VoidCallback onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +157,7 @@ class _PermissionBanner extends StatelessWidget {
               ),
             ),
           ),
+          TextButton(onPressed: onOpenDetail, child: const Text('查看')),
           TextButton(onPressed: onRetry, child: const Text('重新申请')),
         ],
       ),

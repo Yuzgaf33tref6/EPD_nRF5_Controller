@@ -104,10 +104,35 @@ class UpdateChecker {
       debugPrint('[EPD] 更新检查失败：$error');
       return UpdateCheckResult(
         currentVersion: AppVersion.version,
-        error: '查询失败：$error',
+        error: _describeNetworkError(error),
       );
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// 把网络异常翻译成用户能看懂的话。
+  ///
+  /// 最常见的两类是：没有网络权限/没有网络（DNS 解析失败）与超时。
+  static String _describeNetworkError(Object error) {
+    if (error is SocketException) {
+      final String message = error.message;
+      if (error.osError != null && error.osError!.errorCode == 7) {
+        // errno 7 = EAI_NONAME，域名解析不出来。
+        return '查询失败：解析不了 api.github.com。'
+            '请确认手机能正常上网（Wi-Fi 或移动数据），并且没有被代理/VPN 拦住。';
+      }
+      if (message.contains('Failed host lookup')) {
+        return '查询失败：解析不了 api.github.com，请检查手机网络。';
+      }
+      return '查询失败：网络连接不上（${error.osError?.message ?? message}）。';
+    }
+    if (error is TimeoutException) {
+      return '查询失败：连接 GitHub 超时。国内网络访问 api.github.com 经常不稳，稍后再试。';
+    }
+    if (error is HandshakeException) {
+      return '查询失败：TLS 握手失败，可能是代理或证书问题。';
+    }
+    return '查询失败：$error';
   }
 }

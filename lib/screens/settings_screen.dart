@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../widgets/common.dart';
 import 'diagnostics_screen.dart';
 import 'logs_screen.dart';
+import 'permission_screen.dart';
 import 'plane_check_screen.dart';
 import 'releases_screen.dart';
 import 'solid_color_screen.dart';
@@ -379,9 +380,15 @@ class _DiagnosticsGroup extends StatelessWidget {
             onChanged: state.setVerboseTransfers,
           ),
           SettingTile(
+            icon: Icons.verified_user_outlined,
+            title: '权限检查',
+            subtitle: '查看并申请本应用需要的全部系统权限',
+            onTap: () => _push(context, const PermissionScreen()),
+          ),
+          SettingTile(
             icon: Icons.monitor_heart_outlined,
             title: '蓝牙诊断',
-            subtitle: '权限、适配器状态、原始通知',
+            subtitle: '适配器状态、原始通知、链路排查',
             onTap: () => _push(context, const DiagnosticsScreen()),
           ),
           SettingTile(

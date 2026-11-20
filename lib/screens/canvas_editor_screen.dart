@@ -283,11 +283,10 @@ class _CanvasEditorScreenState extends State<CanvasEditorScreen> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: <Widget>[
-                                CustomPaint(
-                                  painter: RgbaImagePainter(
-                                    _working,
-                                    version: _baseVersion,
-                                  ),
+                                RgbaImagePreview(
+                                  image: _working,
+                                  version: _baseVersion,
+                                  maxWidth: double.infinity,
                                 ),
                                 CustomPaint(
                                   painter: _StrokePainter(

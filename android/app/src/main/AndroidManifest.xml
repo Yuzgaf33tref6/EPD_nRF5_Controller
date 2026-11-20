@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 联网权限：只有「检查更新」需要（用户主动点击时才联网）。
+         Flutter 模板默认只在 debug/profile 清单里加这一条，release 包里没有，
+         会导致 dart:io 的 HttpClient 连域名都解析不了
+         （报 SocketException: Failed host lookup: 'api.github.com'）。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- BLE 相关权限。
          - API 18..30：老式蓝牙权限 + 扫描需要定位权限
          - API 31+（Android 12）：改用 BLUETOOTH_SCAN / BLUETOOTH_CONNECT

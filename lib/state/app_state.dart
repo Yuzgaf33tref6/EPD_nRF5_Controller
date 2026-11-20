@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../devices/canvas_size.dart';
 import '../devices/epd_driver.dart';
@@ -22,6 +23,7 @@ import '../image/canvas_editing.dart';
 import '../image/crop_geometry.dart';
 import '../image/dither.dart';
 import '../image/epd_color.dart';
+import '../image/preview_computer.dart';
 import '../image/rgba_image.dart';
 import '../image/sample_image.dart';
 import '../models/transfer_speed.dart';
@@ -63,6 +65,13 @@ class AppStateScope extends InheritedNotifier<AppState> {
         context.dependOnInheritedWidgetOfExactType<AppStateScope>();
     assert(scope != null, 'AppStateScope 没有挂到 widget 树上');
     return scope!.notifier!;
+  }
+
+  /// 取状态但不建立依赖（用于首帧回调里的一次性读取，避免多余重建）。
+  static AppState? maybeOf(BuildContext context) {
+    return context
+        .getInheritedWidgetOfExactType<AppStateScope>()
+        ?.notifier;
   }
 }
 
@@ -371,6 +380,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// 抖动后的预览图。按参数做缓存，参数没变就不重算。
+  ///
+  /// **注意**：这是**同步**版本，会占用当前线程算完（400×300 约几十毫秒）。
+  /// 界面上的实时预览请用 `previewComputer`（后台 isolate）算出来的结果，
+  /// 只有「发送」这种本来就该等的地方才调这里。
   RgbaImage get previewImage {
     final Object key = Object.hash(_sourceImage, _algorithm, _strength,
         _contrast, colorMode, _sourceImage.width, _sourceImage.height);
@@ -385,6 +398,17 @@ class AppState extends ChangeNotifier {
     _previewCacheKey = key;
     return image;
   }
+
+  /// 当前抖动用参数。界面把它交给 [PreviewComputer] 去后台算，避免卡顿。
+  DitherJob get currentDitherJob => DitherJob(
+        width: _sourceImage.width,
+        height: _sourceImage.height,
+        rgba: _sourceImage.data,
+        algorithm: _algorithm,
+        strength: _strength,
+        contrast: _contrast,
+        mode: colorMode,
+      );
 
   /// 当前参数下应发送的完整写指令序列（真算出来的）。
   ///
@@ -878,6 +902,28 @@ class AppState extends ChangeNotifier {
   /// 权限是否已被拒绝（界面据此显示提醒横幅）。
   bool get permissionDenied =>
       _permissionChecked && _permissionGranted == false;
+
+  /// 查询当前所有权限的状态（只读，不弹系统对话框），供「权限检查」页展示。
+  Future<List<AppPermissionStatus>> checkPermissions() async {
+    try {
+      return await _ble.checkPermissions();
+    } catch (error) {
+      addLog(LogLevel.warning, '查询权限状态失败：$error');
+      return const <AppPermissionStatus>[];
+    }
+  }
+
+  /// 打开本应用的系统设置页，让用户手动补授被永久拒绝的权限。
+  Future<void> openSystemSettings() async {
+    try {
+      final bool opened = await openAppSettings();
+      if (!opened && !_disposed) {
+        addLog(LogLevel.warning, '打不开系统设置页，请到「设置 → 应用 → EPD Controller → 权限」手动开启。');
+      }
+    } catch (error) {
+      addLog(LogLevel.warning, '打不开系统设置页：$error');
+    }
+  }
 
   /// 发一条 INIT 探测链路是否真的可写（诊断页用）。
   Future<void> sendDiagnosticInit() async {

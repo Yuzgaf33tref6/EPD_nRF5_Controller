@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../image/dither.dart';
+import '../image/preview_computer.dart';
 import '../image/rgba_image.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
@@ -31,19 +32,56 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   /// 预览显示原图还是抖动后的效果。
   bool _showDither = true;
 
+  /// 后台算好的抖动预览。为 null 时表示还没算完，先拿同步缓存顶上。
+  late final PreviewComputer _preview = PreviewComputer()
+    ..onResult = ((RgbaImage image) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _ditherResult = image);
+    });
+
+  RgbaImage? _ditherResult;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestPreview());
+  }
+
   @override
   void dispose() {
     _strengthDebounce?.cancel();
     _contrastDebounce?.cancel();
+    _preview.dispose();
     super.dispose();
+  }
+
+  /// 把当前参数丢给后台 isolate 算预览。
+  void _requestPreview() {
+    final AppState? state = AppStateScope.maybeOf(context);
+    if (state == null) {
+      return;
+    }
+    _preview.request(state.currentDitherJob);
   }
 
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
     final ThemeData theme = Theme.of(context);
-    final RgbaImage preview =
-        _showDither ? state.previewImage : state.sourceImage;
+    // 后台结果优先；还没算好时用同步缓存，保证界面有东西显示。
+    final RgbaImage preview = _showDither
+        ? (_ditherResult ?? state.previewImage)
+        : state.sourceImage;
+    // 参数一变就重新排队（相同入参会被 PreviewComputer 直接跳过）。
+    if (_showDither) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _requestPreview();
+        }
+      });
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('图像发送'),
@@ -125,6 +163,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                         onChanged: (DitherAlgorithm? value) {
                           if (value != null) {
                             state.setAlgorithm(value);
+                            _requestPreview();
                           }
                         },
                         items: <DropdownMenuItem<DitherAlgorithm>>[
@@ -184,13 +223,19 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                             label: const Text('导入图片'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => state.rotateSource(),
+                            onPressed: () {
+                              state.rotateSource();
+                              _requestPreview();
+                            },
                             icon: const Icon(Icons.rotate_90_degrees_cw,
                                 size: 18),
                             label: const Text('旋转画布'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => state.resetSource(),
+                            onPressed: () {
+                              state.resetSource();
+                              _requestPreview();
+                            },
                             icon: const Icon(Icons.restart_alt, size: 18),
                             label: const Text('重置示例图'),
                           ),
@@ -266,6 +311,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     if (mounted) {
       setState(() => _pendingStrength = null);
     }
+    _requestPreview();
   }
 
   void _commitContrast(double value) {
@@ -275,6 +321,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     if (mounted) {
       setState(() => _pendingContrast = null);
     }
+    _requestPreview();
   }
 
   Future<void> _importImage(AppState state) async {
@@ -295,6 +342,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       return;
     }
     state.replaceSource(cropped);
+    _requestPreview();
     state.addLog(
       LogLevel.success,
       '已导入图片并裁剪到 ${cropped.width}×${cropped.height}',

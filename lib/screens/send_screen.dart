@@ -183,6 +183,10 @@ class _ConnectHint extends StatelessWidget {
 }
 
 /// 图像发送入口卡片：显示一个小尺寸预览 + 进入二级页面。
+///
+/// 这里的缩略图**用原图**而不是抖动结果：抖动要在后台 isolate 里算几十毫秒，
+/// 而首页/发送页只是给个「有图」的指示，没必要为了 72×54 的小图付这个代价
+/// —— 这正是之前一进发送页就发卡的来源之一。
 class _ImageEntryCard extends StatelessWidget {
   const _ImageEntryCard({required this.state});
 
@@ -208,7 +212,7 @@ class _ImageEntryCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: RgbaImagePreview(
-                    image: state.previewImage,
+                    image: state.sourceImage,
                     maxWidth: 72,
                   ),
                 ),

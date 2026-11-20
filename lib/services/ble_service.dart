@@ -51,10 +51,45 @@ class BlePermissionResult {
   final String message;
 }
 
+/// 单条权限的检查结果，供「权限检查」页展示。
+class AppPermissionStatus {
+  const AppPermissionStatus({
+    required this.name,
+    required this.androidName,
+    required this.status,
+    required this.reason,
+    this.alwaysGranted = false,
+  });
+
+  /// 面向用户的名字，例如「附近的设备（扫描）」。
+  final String name;
+
+  /// Android 层面对应的权限名，例如 `BLUETOOTH_SCAN`。
+  final String androidName;
+
+  /// 系统返回的状态原文（granted / denied / permanentlyDenied …）。
+  final PermissionStatus status;
+
+  /// 为什么需要这条权限。
+  final String reason;
+
+  /// 该权限在系统里不存在（老版本 Android），视为不需要。
+  final bool alwaysGranted;
+
+  /// 是否已经可用。
+  bool get granted => alwaysGranted || status.isGranted;
+
+  /// 是否被永久拒绝（需要去系统设置里开）。
+  bool get permanentlyDenied => !alwaysGranted && status.isPermanentlyDenied;
+}
+
 /// 蓝牙链路抽象。真实现见 [ReactiveBleService]，测试用 FakeBleService。
 abstract class EpdBleService {
   /// 申请运行时权限（Android 12+ 的 BLUETOOTH_SCAN/CONNECT，老系统的定位权限）。
   Future<BlePermissionResult> ensurePermissions();
+
+  /// **只查询**当前权限状态，不弹系统对话框。
+  Future<List<AppPermissionStatus>> checkPermissions();
 
   /// 当前蓝牙子系统状态描述（蓝牙关闭 / 未授权 / 可用）。
   Future<String> describeAdapterStatus();
@@ -172,6 +207,39 @@ class ReactiveBleService implements EpdBleService {
           _notifications.stream.listen(controller.add);
       controller.onCancel = subscription.cancel;
     });
+  }
+
+  @override
+  Future<List<AppPermissionStatus>> checkPermissions() async {
+    // 一次问完所有权限的当前状态（不会弹窗）。
+    final Map<Permission, PermissionStatus> statuses =
+        await <Permission>[
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ].status;
+
+    return <AppPermissionStatus>[
+      AppPermissionStatus(
+        name: '附近的设备（扫描）',
+        androidName: 'BLUETOOTH_SCAN',
+        status: statuses[Permission.bluetoothScan] ?? PermissionStatus.denied,
+        reason: '扫描周围墨水屏需要；Android 12 起属于「附近的设备」。',
+      ),
+      AppPermissionStatus(
+        name: '附近的设备（连接）',
+        androidName: 'BLUETOOTH_CONNECT',
+        status: statuses[Permission.bluetoothConnect] ?? PermissionStatus.denied,
+        reason: '连接设备、读写特征值、接收通知需要。',
+      ),
+      AppPermissionStatus(
+        name: '位置信息',
+        androidName: 'ACCESS_FINE_LOCATION',
+        status: statuses[Permission.locationWhenInUse] ??
+            PermissionStatus.denied,
+        reason: 'Android 11 及以下扫描蓝牙必须开定位；12 起不再要求。',
+      ),
+    ];
   }
 
   @override

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
 import '../widgets/common.dart';
+import 'permission_screen.dart';
 
-/// 蓝牙诊断页：权限、适配器状态、原始通知。
+/// 蓝牙诊断页：链路状态、诊断动作、原始通知。系统权限集中在「权限检查」页。
 class DiagnosticsScreen extends StatelessWidget {
   const DiagnosticsScreen({super.key});
 
@@ -56,8 +57,12 @@ class DiagnosticsScreen extends StatelessWidget {
                       child: const Text('刷新蓝牙状态'),
                     ),
                     OutlinedButton(
-                      onPressed: state.retryPermissions,
-                      child: const Text('申请蓝牙权限'),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const PermissionScreen(),
+                        ),
+                      ),
+                      child: const Text('权限检查'),
                     ),
                     OutlinedButton(
                       onPressed:
@@ -68,8 +73,8 @@ class DiagnosticsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '扫描不到设备时依次检查：蓝牙已打开；系统设置里允许了'
-                  '「附近的设备」；墨水屏已开机（按一下唤醒）；没有别的手机连着它。',
+                  '扫描不到设备时依次检查：蓝牙已打开；「权限检查」页里'
+                  '「附近的设备」已授权；墨水屏已开机（按一下唤醒）；没有别的手机连着它。',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

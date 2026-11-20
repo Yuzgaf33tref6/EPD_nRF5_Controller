@@ -71,6 +71,9 @@ class InfoRow extends StatelessWidget {
     this.labelWidth = 84,
     this.valueColor,
     this.monospace = false,
+    this.onTap,
+    this.onCopy,
+    this.trailing,
   });
 
   final String label;
@@ -81,11 +84,21 @@ class InfoRow extends StatelessWidget {
   /// 值用等宽字体（引脚、十六进制串看起来更整齐）。
   final bool monospace;
 
+  /// 点击整行时触发（例如打开链接）。
+  final VoidCallback? onTap;
+
+  /// 点击复制按钮时触发；为 null 则不显示复制按钮。参数是 [value]。
+  final ValueChanged<String>? onCopy;
+
+  /// 值右侧的额外内容（例如「打开」「复制」图标按钮）。
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+    final bool tappable = onTap != null;
+    final Widget row = Padding(
+      padding: EdgeInsets.symmetric(vertical: tappable ? 6 : 3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -102,13 +115,29 @@ class InfoRow extends StatelessWidget {
             child: Text(
               value,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: valueColor,
+                color: tappable ? theme.colorScheme.primary : valueColor,
                 fontFamily: monospace ? 'monospace' : null,
+                decoration: tappable ? TextDecoration.underline : null,
+                decorationColor: tappable
+                    ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                    : null,
               ),
             ),
           ),
+          if (trailing != null) ...<Widget>[
+            const SizedBox(width: 4),
+            trailing!,
+          ],
         ],
       ),
+    );
+    if (!tappable) {
+      return row;
+    }
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: row,
     );
   }
 }

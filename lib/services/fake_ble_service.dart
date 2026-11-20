@@ -8,6 +8,8 @@ library;
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:permission_handler/permission_handler.dart';
+
 import '../protocol/epd_protocol.dart';
 import '../protocol/transfer.dart';
 import 'ble_service.dart';
@@ -99,6 +101,32 @@ class FakeBleService implements EpdBleService {
       granted: true,
       message: '（模拟）蓝牙权限已授予',
     );
+  }
+
+  @override
+  Future<List<AppPermissionStatus>> checkPermissions() async {
+    final PermissionStatus status =
+        grantPermission ? PermissionStatus.granted : PermissionStatus.denied;
+    return <AppPermissionStatus>[
+      AppPermissionStatus(
+        name: '附近的设备（扫描）',
+        androidName: 'BLUETOOTH_SCAN',
+        status: status,
+        reason: '扫描周围墨水屏需要；Android 12 起属于「附近的设备」。',
+      ),
+      AppPermissionStatus(
+        name: '附近的设备（连接）',
+        androidName: 'BLUETOOTH_CONNECT',
+        status: status,
+        reason: '连接设备、读写特征值、接收通知需要。',
+      ),
+      AppPermissionStatus(
+        name: '位置信息',
+        androidName: 'ACCESS_FINE_LOCATION',
+        status: status,
+        reason: 'Android 11 及以下扫描蓝牙必须开定位；12 起不再要求。',
+      ),
+    ];
   }
 
   @override
