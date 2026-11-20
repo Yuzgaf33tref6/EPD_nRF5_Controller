@@ -32,8 +32,8 @@ void main() {
   group('缩放', () {
     test('滚轮放大/缩小并夹在 0.1~5 之间', () {
       expect(cropViewZoomByWheel(1, zoomIn: true), closeTo(1.1, 1e-9));
-      // 允许缩到 1 以下：1 / 1.1 ≈ 0.909。
-      expect(cropViewZoomByWheel(1, zoomIn: false), closeTo(0.90909, 1e-5));
+      // 允许缩到 1 以下：缩小一格是 ×0.9（不是 ÷1.1）。
+      expect(cropViewZoomByWheel(1, zoomIn: false), closeTo(0.9, 1e-9));
       expect(cropViewZoomByWheel(2, zoomIn: false), closeTo(1.8, 1e-9));
       expect(cropViewZoomByWheel(4.9, zoomIn: true), 5);
       // 缩到底也不会低于 0.1，更不会变成 0 或负数。
