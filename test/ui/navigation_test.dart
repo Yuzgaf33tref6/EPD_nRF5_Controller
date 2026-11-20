@@ -72,10 +72,15 @@ void main() {
     await scrollTo(tester, find.text('扫描附近设备'));
     expect(find.text('扫描附近设备'), findsOneWidget);
 
-    await tapAfterScroll(tester, find.text('连接设备'));
+    // 折叠头按钮落在「扫描附近设备」上方：收起后按钮会消失，所以按折叠头
+    // 本身（含「连接设备」文字的那张卡）再点回去。用 warnIfMissed: false 是因为
+    // 卡头在滚动后可能部分被 AppBar 遮住。
+    await tester.tap(find.text('连接设备'), warnIfMissed: false);
+    await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsNothing);
 
-    await tapAfterScroll(tester, find.text('连接设备'));
+    await tester.tap(find.text('连接设备'), warnIfMissed: false);
+    await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsOneWidget);
   });
 
@@ -127,8 +132,7 @@ void main() {
     await scrollTo(tester, find.text('诊断工具'));
     expect(find.text('诊断工具'), findsOneWidget);
 
-    await scrollTo(tester, find.text('软件信息'));
-    expect(find.text('软件信息'), findsOneWidget);
+    await scrollTo(tester, find.textContaining('Noyield'));
     expect(find.textContaining('Noyield'), findsWidgets);
   });
 

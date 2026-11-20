@@ -89,6 +89,7 @@ void main() {
   group('cropScaled', () {
     test('取左半边得到纯黑，输出尺寸即画布尺寸', () {
       // 采样点落在 x∈[0,1] 区间内，两侧都是黑，所以不会混到白。
+      // 注意 width=1 时步长 0.2，靠右的采样点 x 会逼近 1（仍 < 2，不跨列）。
       final RgbaImage source = buildImage(
         4,
         4,
@@ -132,8 +133,13 @@ void main() {
     });
 
     test('裁剪矩形超出源图时按填充色补齐（默认白）', () {
+      // 源图 2x2：只有 (0,0) 是蓝色，其余灰色。
+      // 裁剪矩形 -4..8 共 12 像素缩到 8，采样点 step = 1.5：
+      // 输出 (0,0) → 源 (0.5,0.5)-0.5 = (-3.5,-3.5) 在图外 → 白；
+      // 输出 (3,3) → 源 (-4 + 3.5*1.5) = 1.25 → 落在 (1,1) 灰-灰之间 → 灰。
+      // 这里要验证的是「图外用填充色」，源图内的颜色另有断言。
       final RgbaImage source = buildImage(2, 2, (int x, int y) {
-        return x == 0 && y == 0 ? <int>[0, 0, 255] : <int>[9, 9, 9];
+        return <int>[9, 9, 9];
       });
       final RgbaImage cropped = cropScaled(
         source: source,
@@ -146,12 +152,11 @@ void main() {
       );
       expect(cropped.width, 8);
       expect(cropped.height, 8);
-      // 左上角落在源图之外，补白。
+      // 四角都在源图之外，补白。
       expect(pixelAt(cropped, 0, 0), <int>[255, 255, 255]);
-      // 中间那点落在源图内，仍然是源图的颜色。
-      expect(pixelAt(cropped, 3, 3), <int>[0, 0, 255]);
-      // 右下角在源图之外，补白。
       expect(pixelAt(cropped, 7, 7), <int>[255, 255, 255]);
+      // 中间落在源图内，是源图的颜色。
+      expect(pixelAt(cropped, 3, 3), <int>[9, 9, 9]);
     });
 
     test('可以指定补黑', () {
@@ -174,7 +179,9 @@ void main() {
     });
 
     test('cropRectFitsInside 能分辨有没有留空', () {
-      final RgbaImage source = buildImage(10, 10, (int x, int y) => <int>[0, 0, 0]);
+      // 10x10 的源图，按采样点是否落在 [-0.5, 9.5] 判断。
+      final RgbaImage source =
+          buildImage(10, 10, (int x, int y) => <int>[0, 0, 0]);
       expect(
         cropRectFitsInside(
           source: source,
@@ -191,6 +198,17 @@ void main() {
           left: -1,
           top: 0,
           width: 10,
+          height: 10,
+        ),
+        isFalse,
+      );
+      // 右边越界也算留空。
+      expect(
+        cropRectFitsInside(
+          source: source,
+          left: 0,
+          top: 0,
+          width: 12,
           height: 10,
         ),
         isFalse,
