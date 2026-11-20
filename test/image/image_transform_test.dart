@@ -89,8 +89,9 @@ void main() {
   group('cropScaled', () {
     test('取左半边得到纯黑，输出尺寸即画布尺寸', () {
       // 采样点按 (i+0.5)*step-0.5 取，i=0 时恒为负；所以「让采样点全部不越界」
-      // 要求 left≈0.5-0.5*stepX。这里取的矩形刚好让 fx 落在 0.000..0.990、
-      // fy 落在 0.000..0.042，全都贴着源图左上角的黑色区域，故输出应全黑。
+      // 要求 left≈0.5-0.5*stepX。这里取的矩形让 fx 落在 0.010..1.900、
+      // fy 落在 0.010..2.927，全部严格位于源图左两列的黑色区域内，
+      // 且离源图边界与黑/白分界都留有余量，故输出应全黑。
       final RgbaImage source = buildImage(
         4,
         4,
@@ -98,10 +99,10 @@ void main() {
       );
       final RgbaImage cropped = cropScaled(
         source: source,
-        left: 0.445,
-        top: 0.4958,
-        width: 1.1,
-        height: 0.05,
+        left: 0.405,
+        top: 0.2183,
+        width: 2.1,
+        height: 3.5,
         outWidth: 10,
         outHeight: 6,
       );

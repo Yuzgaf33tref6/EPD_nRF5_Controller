@@ -72,15 +72,25 @@ void main() {
     await scrollTo(tester, find.text('扫描附近设备'));
     expect(find.text('扫描附近设备'), findsOneWidget);
 
-    // 折叠头是可点的 InkWell，标题「连接设备」在里面。滚到它可见再点，
-    // 免得点中被 AppBar 遮住的那一半。
-    await tester.ensureVisible(find.text('连接设备').first);
+    // 折叠头是包住「连接设备」那一行的 InkWell；直接点 InkWell 本体，
+    // 比点其中的 Text 更可靠（Text 位于 Expanded 里，tap 中心可能落在
+    // 行内其他兄弟组件上）。
+    final Finder header = find
+        .ancestor(
+          of: find.text('连接设备').first,
+          matching: find.byType(InkWell),
+        )
+        .first;
+    await tester.ensureVisible(header);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('连接设备').first, warnIfMissed: false);
+    await tester.tap(header);
     await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsNothing);
 
-    await tester.tap(find.text('连接设备').first, warnIfMissed: false);
+    // 收起后列表变短，折叠头位置会变；再定位一次比较稳。
+    await tester.ensureVisible(header);
+    await tester.pumpAndSettle();
+    await tester.tap(header);
     await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsOneWidget);
   });
