@@ -27,6 +27,7 @@ import '../image/preview_computer.dart';
 import '../image/rgba_image.dart';
 import '../image/sample_image.dart';
 import '../models/transfer_speed.dart';
+import '../protocol/debug_commands.dart';
 import '../protocol/epd_protocol.dart';
 import '../protocol/transfer.dart';
 import '../services/ble_service.dart';
@@ -1029,6 +1030,65 @@ class AppState extends ChangeNotifier {
     addLog(LogLevel.success, '$label：${_hex(writes.first.payload)}');
     notifyListeners();
   }
+
+  /// 发送一条自定义单指令（`0x03` / `0x04` / `0x21` / `0x90` / `0x91` / `0x92` / `0x99`）。
+  ///
+  /// [payload] 已经是完整的「命令字 + 数据」，界面层用
+  /// `lib/protocol/debug_commands.dart` 里的构造函数拼好再传进来。
+  /// 参数是否合理由调用方先行校验（不合规也允许发，只是要提示用户），
+  /// 这里只负责真的把字节写下去。
+  Future<void> sendRawCommand(String label, Uint8List payload) async {
+    if (!_requireConnected(label)) {
+      return;
+    }
+    await _sendSimple(label, <EpdWrite>[
+      EpdWrite(payload: payload, withResponse: true),
+    ]);
+  }
+
+  /// `0x03`：把 1 字节命令码写进屏幕控制器的命令寄存器。
+  Future<void> sendScreenCommand(Uint8List data) =>
+      sendRawCommand('发送屏幕命令', buildSendCommand(data));
+
+  /// `0x04`：把数据写进屏幕控制器的数据寄存器。
+  Future<void> sendScreenData(Uint8List data) =>
+      sendRawCommand('发送屏幕数据', buildSendData(data));
+
+  /// `0x21`：设置日历的周起始日（0=周日 … 6=周六）。
+  Future<void> setWeekStart(int weekStart) =>
+      sendRawCommand('设置周起始日', buildWeekStart(weekStart));
+
+  /// `0x90`：写配置。只写前 [byteCount] 项，其余字段保持设备上的原值。
+  ///
+  /// 固件不会重载 GPIO/驱动，写完必须再发 `0x91` 重启才生效。
+  Future<void> writeConfig(EpdConfigPayload config, {int? byteCount}) {
+    final Uint8List bytes = config.firstBytes(byteCount ?? EpdConfigPayload.size);
+    return sendRawCommand(
+      '写配置（${bytes.length} 项）',
+      buildCommand(EpdCmd.setConfig, bytes),
+    );
+  }
+
+  /// `0x91`：重启芯片，链路会断，需要重新连接。
+  Future<void> systemReset() async {
+    await sendRawCommand('系统重启', buildSystemReset());
+  }
+
+  /// `0x92`：深度睡眠。发送后设备只能靠唤醒引脚唤醒，**无法通过网络唤醒**。
+  Future<void> systemSleep() async {
+    await sendRawCommand('系统睡眠', buildSystemSleep());
+  }
+
+  /// `0x99`：抹掉配置并重启，等于恢复出厂默认。
+  Future<void> eraseConfig() async {
+    await sendRawCommand('恢复默认配置', buildConfigErase());
+  }
+
+  /// 固件配置通知里的唤醒引脚；还没收到配置时是 null。
+  int? get wakeupPin => _config?.wakeupPin;
+
+  /// `0x92` 的安全判断，界面据此决定是禁用还是要用户二次确认。
+  SleepSafety get sleepSafety => evaluateSleepSafety(wakeupPin);
 
   /// 把当前预览图真正发到设备：按 [transferPlan] 逐条写特征值。
   Future<void> sendPreview() async {

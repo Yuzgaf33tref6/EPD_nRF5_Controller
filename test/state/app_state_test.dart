@@ -9,6 +9,7 @@ import 'package:epd_controller/image/dither.dart';
 import 'package:epd_controller/image/epd_color.dart';
 import 'package:epd_controller/image/rgba_image.dart';
 import 'package:epd_controller/models/transfer_speed.dart';
+import 'package:epd_controller/protocol/debug_commands.dart';
 import 'package:epd_controller/protocol/epd_protocol.dart';
 import 'package:epd_controller/protocol/transfer.dart';
 import 'package:epd_controller/services/ble_service.dart';
@@ -655,6 +656,96 @@ void main() {
       expect(state.permissionDenied, isTrue);
       expect(await state.retryPermissions(), isFalse);
       expect(state.permissionDenied, isTrue);
+    });
+  });
+
+  group('调试指令', () {
+    /// 连上设备，返回 (state, fake)。
+    Future<(AppState, FakeBleService)> connected() async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      addTearDown(state.dispose);
+      addTearDown(ble.dispose);
+      await state.connect(
+        const EpdBleDevice(id: 'C4:7F:51:00:00:01', name: 'EPD-4.2-BWR', rssi: -46),
+      );
+      await settle();
+      return (state, ble);
+    }
+
+    test('0x03 会把命令字和数据一起发出去', () async {
+      final (AppState state, FakeBleService ble) = await connected();
+      final int before = ble.writtenPayloads.length;
+      await state.sendScreenCommand(Uint8List.fromList(<int>[0x22]));
+      expect(ble.writtenPayloads.length, before + 1);
+      expect(ble.writtenPayloads.last, <int>[0x03, 0x22]);
+    });
+
+    test('0x04 带多字节数据', () async {
+      final (AppState state, FakeBleService ble) = await connected();
+      await state.sendScreenData(Uint8List.fromList(<int>[0x11, 0x22, 0x33]));
+      expect(ble.writtenPayloads.last, <int>[0x04, 0x11, 0x22, 0x33]);
+    });
+
+    test('0x21 设置周起始日', () async {
+      final (AppState state, FakeBleService ble) = await connected();
+      await state.setWeekStart(1);
+      expect(ble.writtenPayloads.last, <int>[0x21, 0x01]);
+    });
+
+    test('0x90 只发到最后一个变化的字段', () async {
+      final (AppState state, FakeBleService ble) = await connected();
+      // 只改 model_id（第 8 项）→ 负载应当是 0x90 + 前 8 字节。
+      final EpdConfigPayload cfg =
+          EpdConfigPayload.factoryDefault.copyWith(modelId: 0x05);
+      await state.writeConfig(cfg, byteCount: 8);
+      final List<int> sent = ble.writtenPayloads.last;
+      expect(sent.length, 9); // 命令字 + 8 字节
+      expect(sent.first, 0x90);
+      expect(sent[8], 0x05); // 第 8 个数据字节就是 model_id
+    });
+
+    test('0x91 / 0x92 / 0x99 都只发一个命令字', () async {
+      final (AppState state, FakeBleService ble) = await connected();
+      await state.systemReset();
+      expect(ble.writtenPayloads.last, <int>[0x91]);
+      await state.systemSleep();
+      expect(ble.writtenPayloads.last, <int>[0x92]);
+      await state.eraseConfig();
+      expect(ble.writtenPayloads.last, <int>[0x99]);
+    });
+
+    test('未连接时不发任何字节，只记一条警告', () async {
+      final FakeBleService ble = buildFake();
+      final AppState state = buildState(ble: ble);
+      addTearDown(state.dispose);
+      addTearDown(ble.dispose);
+      await state.systemReset();
+      expect(ble.writtenPayloads, isEmpty);
+      expect(state.logs.last.level, LogLevel.warning);
+    });
+
+    test('收到完整配置后能拿到唤醒引脚，睡眠判定为 safe', () async {
+      final (AppState state, _) = await connected();
+      expect(state.wakeupPin, 0x09);
+      expect(state.sleepSafety, SleepSafety.safe);
+    });
+
+    test('配置里唤醒引脚为 0xFF 时判定为 unsafe', () async {
+      final FakeBleService ble = FakeBleService(
+        scanDelay: Duration.zero,
+        connectDelay: Duration.zero,
+        wakeupPin: 0xFF,
+      );
+      final AppState state = buildState(ble: ble);
+      addTearDown(state.dispose);
+      addTearDown(ble.dispose);
+      await state.connect(
+        const EpdBleDevice(id: 'C4:7F:51:00:00:01', name: 'EPD-4.2-BWR', rssi: -46),
+      );
+      await settle();
+      expect(state.wakeupPin, 0xFF);
+      expect(state.sleepSafety, SleepSafety.unsafe);
     });
   });
 }

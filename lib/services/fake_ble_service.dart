@@ -21,6 +21,7 @@ class FakeBleService implements EpdBleService {
     this.connectDelay = const Duration(milliseconds: 450),
     this.driverCode = 0x03,
     this.grantPermission = true,
+    this.wakeupPin = 0x09,
   });
 
   /// 模拟的固件版本，与上游 `EPD_service.h` 的 `APP_VERSION 0x1a` 一致。
@@ -43,6 +44,10 @@ class FakeBleService implements EpdBleService {
 
   /// 权限申请是否会被批准（用来测「用户拒绝权限」分支）。
   final bool grantPermission;
+
+  /// 固件配置里上报的唤醒引脚。默认 0x09（老五 4.2 寸三色的值）；
+  /// 传 0xFF 可以模拟「没配唤醒引脚」，那种情况下不该允许发 0x92。
+  final int wakeupPin;
 
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
@@ -201,7 +206,17 @@ class FakeBleService implements EpdBleService {
   /// 7 字节引脚 + 1 字节驱动 id，与固件的配置通知格式一致。
   Uint8List _configNotification() {
     final Uint8List pins = parseHexBytes(pinsHex);
-    return Uint8List.fromList(<int>[...pins, driverCode]);
+    // 真实固件推的是完整 13 字节 epd_config_t；只有 8~10 字节的老固件才拿不到
+    // 唤醒引脚。这里默认按完整配置推，测试可以改 wakeupPin 来模拟不同情况。
+    return Uint8List.fromList(<int>[
+      ...pins,
+      driverCode,
+      wakeupPin, // 索引 8
+      0x03, // led_pin
+      0xFF, // en_pin
+      0x00, // display_mode
+      0x00, // week_start
+    ]);
   }
 
   /// `mtu=20 rle=1`，UTF-8 编码。

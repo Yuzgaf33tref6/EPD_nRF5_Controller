@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/image_preview.dart';
+import 'debug_commands_screen.dart';
 import 'image_send_screen.dart';
 
 /// 发送页：一级放设备指令，图像发送作为二级页面的入口。
@@ -102,6 +103,22 @@ class SendScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _ImageEntryCard(state: state),
+                const SizedBox(height: 12),
+                SectionCard(
+                  title: '调试',
+                  icon: Icons.build_outlined,
+                  child: SettingTile(
+                    icon: Icons.terminal,
+                    title: '设备指令 · 调试',
+                    subtitle: '直接发 0x03 / 0x04 / 0x21 / 0x90 / 0x91 / 0x92 / 0x99，'
+                        '以及纯色测试',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DebugCommandsScreen(),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 SectionCard(
                   title: '当前参数',

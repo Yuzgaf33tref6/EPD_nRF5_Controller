@@ -257,13 +257,19 @@ int _writeImageFlag({
 
 /// 连接后收到的第一条通知：当前引脚配置 + 驱动 id。
 class EpdConfig {
-  const EpdConfig({required this.pins, required this.driver});
+  const EpdConfig({required this.pins, required this.driver, this.wakeupPin});
 
   /// 引脚号列表。通常是 7 个，`byte[10]` 存在时会多一个（第 8 个引脚）。
   final Uint8List pins;
 
   /// 驱动 id（`html/js/main.js` 里驱动下拉框的值，如 0x03）。
   final int driver;
+
+  /// 唤醒引脚（固件 `epd_config_t` 的第 9 个字节，索引 8）。
+  ///
+  /// 配置通知刚好 13 字节时才有；只有 8~10 字节的老固件拿不到，为 null。
+  /// `0xFF` 表示固件没配唤醒引脚 —— 那种情况下发 `0x92` 深度睡眠就再也唤醒不了。
+  final int? wakeupPin;
 }
 
 /// 解析配置通知，对应 web 版 `handleNotify(value, 0)`。
@@ -281,7 +287,12 @@ EpdConfig parseConfigNotification(Uint8List value) {
   if (value.length > 10) {
     pins.add(value[10]);
   }
-  return EpdConfig(pins: Uint8List.fromList(pins), driver: value[7]);
+  return EpdConfig(
+    pins: Uint8List.fromList(pins),
+    driver: value[7],
+    // 13 字节的完整配置里，索引 8 是 wakeup_pin（见 EPD/EPD_config.h）。
+    wakeupPin: value.length >= 13 ? value[8] : null,
+  );
 }
 
 /// 连接后除第一条以外的通知：UTF-8 文本，形如 `mtu=247 rle=1` 或 `t=1763500000`。
