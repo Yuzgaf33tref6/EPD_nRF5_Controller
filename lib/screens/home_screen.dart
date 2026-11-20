@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../services/app_info.dart';
 import '../services/ble_service.dart';
-import '../services/permission_gate.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/connection_status_card.dart';
 import '../widgets/image_preview.dart';
 import 'logs_screen.dart';
 import 'releases_screen.dart';
-import 'send_screen.dart';
-import 'settings_screen.dart';
 
 /// 首页：连接状态大卡片 + 快捷按钮 + 折叠的设备扫描 + 应用与设备信息。
 class HomeScreen extends StatefulWidget {

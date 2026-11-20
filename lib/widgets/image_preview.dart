@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../image/rgba_image.dart';
-import '../protocol/epd_protocol.dart';
 import '../state/app_state.dart';
 
 /// 一张 RGBA 位图的绘制器。
