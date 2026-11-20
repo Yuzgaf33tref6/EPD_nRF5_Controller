@@ -88,10 +88,11 @@ void main() {
 
   group('cropScaled', () {
     test('取左半边得到纯黑，输出尺寸即画布尺寸', () {
-      // 采样点按 (i+0.5)*step-0.5 取，i=0 时恒为负；所以「让采样点全部不越界」
-      // 要求 left≈0.5-0.5*stepX。这里取的矩形让 fx 落在 0.010..1.900、
-      // fy 落在 0.010..2.927，全部严格位于源图左两列的黑色区域内，
-      // 且离源图边界与黑/白分界都留有余量，故输出应全黑。
+      // 采样点按 (i+0.5)*step-0.5 取，i=0 时为负；想要「全部落在源图内」就得把
+      // left/top 抬高约半个采样步长。另一个坑是双线性会跨越相邻两列，所以
+      // fx 必须保证 floor(fx) <= 1（源图左两列是黑，第 2 列起是白）。
+      // 下面这组参数经计算得 fx = 0.050..0.950、fy = 0.050..2.550，
+      // 全部落在黑色区域内，故输出应全黑。
       final RgbaImage source = buildImage(
         4,
         4,
@@ -99,10 +100,10 @@ void main() {
       );
       final RgbaImage cropped = cropScaled(
         source: source,
-        left: 0.405,
-        top: 0.2183,
-        width: 2.1,
-        height: 3.5,
+        left: 0.5,
+        top: 0.3,
+        width: 1,
+        height: 3,
         outWidth: 10,
         outHeight: 6,
       );

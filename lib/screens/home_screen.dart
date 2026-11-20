@@ -31,15 +31,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
-    // 连上之后自动收起扫描区；用户点过折叠头就以用户的意愿为准。
-    if (state.isConnected && !_wasConnected) {
-      _wasConnected = true;
-      _expandedOverride = false;
-    } else if (!state.isConnected) {
-      _wasConnected = false;
-      _expandedOverride = null;
+    // 连上之后自动收起扫描区；断开之后恢复成「未连接时自动展开」。
+    // 注意：这里只在**连接状态发生变化**时才改动 _expandedOverride，
+    // 否则每次重建都会把用户手动折叠/展开的选择覆盖掉。
+    // （之前写成无条件 `else { _expandedOverride = null; }`，
+    //   导致未连接时用户点了折叠头又会立刻被展开回来。）
+    final bool connected = state.isConnected;
+    if (connected != _wasConnected) {
+      _wasConnected = connected;
+      _expandedOverride = connected ? false : null;
     }
-    final bool expanded = _expandedOverride ?? !state.isConnected;
+    final bool expanded = _expandedOverride ?? !connected;
     if (!_autoExpandApplied) {
       _autoExpandApplied = true;
       state.ensurePermissionsOnce();
