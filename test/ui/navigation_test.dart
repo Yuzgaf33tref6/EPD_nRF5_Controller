@@ -164,7 +164,8 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('设置'), findsOneWidget);
+    // 「设置」既是 AppBar 标题也是底部导航标签，所以用 findsWidgets。
+    expect(find.text('设置'), findsWidgets);
   });
 
   testWidgets('设置页 → 蓝牙诊断 → 返回', (WidgetTester tester) async {
