@@ -1,8 +1,7 @@
 name: epd_controller
 description: EPD-nRF5 墨水屏控制器 Android 客户端
 publish_to: 'none'
-version: 0.2.0+2
-
+version: 0.2.1+3
 environment:
   sdk: ^3.9.0
 

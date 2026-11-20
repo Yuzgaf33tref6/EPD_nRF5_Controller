@@ -11,10 +11,10 @@ class AppVersion {
   ///
   /// `test/app_version_test.dart` 会读 `pubspec.yaml` 校验两边一致，
   /// 忘记同步时 CI 会直接失败。
-  static const String version = '0.2.0';
+  static const String version = '0.2.1';
 
   /// 构建号，与 `pubspec.yaml` 里 `version: x.y.z+N` 的 N 一致。
-  static const int buildNumber = 2;
+  static const int buildNumber = 3;
 
   /// 完整版本串，例如 `0.2.0+2`。
   static String get fullVersion => '$version+$buildNumber';
@@ -94,6 +94,29 @@ class ReleaseNote {
 
 /// 全部更新日志，最新在前。
 const List<ReleaseNote> kReleaseNotes = <ReleaseNote>[
+  ReleaseNote(
+    version: '0.2.1',
+    date: '2026-11-20',
+    highlights: <String>[
+      '修复：检查更新一直失败 —— release 包缺少联网权限（INTERNET）。',
+      '修复：裁剪页预览图缩小偏在左上角、和实际出图不一致（预览尺寸误用了原图尺寸）。',
+      '裁剪页重做取景模型：缩放 0.1~5 倍，可以缩到比取景框小，四周按底色（白/黑）补齐；'
+          '缩小后可在画面内自由摆放，不再被顶到边缘。',
+      '导入图片上限从 2400 提到 4096，裁剪预览从 720 提到 1080，放大细看更清楚。',
+      '竖图导入横屏画布时会提示“建议先旋转 90°”，并在裁剪页提供旋转按钮。',
+      '预览绘制改到后台 isolate，图像发送页与画布编辑页不再因抖动计算卡顿。',
+      '新增「权限检查」页：集中查看并申请本应用需要的全部系统权限，可跳转系统设置。',
+      '关于与更新页：仓库 / 固件地址可点击、可复制，作者名可点击；与设置页的「关于」统一为同一份内容。',
+      '新增「设备指令 · 调试」页：0x03 发送命令、0x04 写数据、0x21 周起始日、'
+          '0x90 自定义配置、0x91 系统重启、0x92 系统睡眠、0x99 恢复默认配置，'
+          '以及全黑 / 全白 / 全红纯色测试，全部使用十六进制输入。',
+      '0x92 系统睡眠按配置里的唤醒引脚做安全判定：未配置唤醒引脚时直接禁用；'
+          '没收到配置时需勾选确认才能发送。',
+      '设备指令面板重新排版：0x20 时间同步（日历 / 时钟）与常用 0x0X 指令分栏显示，指令编号独立成行。',
+      '连接设备后自动折叠扫描区；折叠提示改为“扫描到 N 个设备”。',
+      '蓝牙诊断页与首页设备信息新增信号强度（RSSI），可手动刷新。',
+    ],
+  ),
   ReleaseNote(
     version: '0.2.0',
     date: '2026-11-20',

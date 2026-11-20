@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:epd_controller/main.dart';
+import 'package:epd_controller/services/app_info.dart';
 
 /// UI 导航测试：底部三栏、各二级页面能打开与返回。
 ///
@@ -221,7 +222,8 @@ void main() {
     await pumpApp(tester);
     await switchTab(tester, 2);
     await tapAfterScroll(tester, find.text('更新日志'));
-    expect(find.textContaining('0.2.0'), findsWidgets);
+    // 最新一版（目前是 0.2.1）应当直接出现在首屏。
+    expect(find.textContaining(AppVersion.version), findsWidgets);
     await scrollTo(tester, find.textContaining('0.1.0'));
     expect(find.textContaining('0.1.0'), findsWidgets);
   });
