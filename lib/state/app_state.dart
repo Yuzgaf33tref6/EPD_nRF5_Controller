@@ -842,6 +842,10 @@ class AppState extends ChangeNotifier {
   /// 与 [requestBlePermission] 的区别：这里不写日志（启动阶段日志面板还是空的），
   /// 结果交给界面自己展示；同时顺手把蓝牙子系统状态刷一次，供首页显示。
   Future<bool> requestPermissions() async {
+    // 只要真的问过一次系统，就算「检查过」——界面据此决定是否显示提醒横幅。
+    // 不能依赖调用方（ensurePermissionsOnce / retryPermissions）记得打这个标记，
+    // 否则直接调 requestPermissions 时 permissionDenied 永远是 false。
+    _permissionChecked = true;
     final BlePermissionResult result = await _ble.ensurePermissions();
     try {
       _adapterStatusText = await _ble.describeAdapterStatus();
@@ -857,12 +861,11 @@ class AppState extends ChangeNotifier {
 
   /// 启动后自动做一次权限检查（只在首次启动时真正弹系统对话框）。
   ///
-  /// 由 `EpdControllerApp` 在首帧后调用；测试可以注入 [PermissionGate] 绕开。
+  /// 由 `EpdControllerApp` 在首帧后调用；之后再调不会重复申请。
   Future<void> ensurePermissionsOnce() async {
     if (_permissionChecked) {
       return;
     }
-    _permissionChecked = true;
     await requestPermissions();
   }
 
