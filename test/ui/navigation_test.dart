@@ -99,7 +99,8 @@ void main() {
     await pumpApp(tester);
     await switchTab(tester, 1);
     expect(find.text('设备指令'), findsOneWidget);
-    expect(find.textContaining('同步时间'), findsOneWidget);
+    expect(find.textContaining('时间同步'), findsOneWidget);
+    expect(find.text('日历模式'), findsOneWidget);
     await scrollTo(tester, find.text('图像发送'));
     expect(find.text('图像发送'), findsOneWidget);
   });

@@ -35,68 +35,60 @@ class SendScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Row(
+                      // 第一栏：时间同步（0x20，两种模式）。
+                      _CommandSection(
+                        title: '0x20 时间同步',
                         children: <Widget>[
-                          Expanded(
-                            child: FilledButton.tonalIcon(
-                              onPressed: connected
-                                  ? () => state.syncTime(clockMode: false)
-                                  : null,
-                              icon: const Icon(Icons.event, size: 18),
-                              label: const Text('0x20 同步时间'),
-                            ),
+                          _CommandButton(
+                            code: '0x20',
+                            label: '日历模式',
+                            filled: true,
+                            onPressed: connected
+                                ? () => state.syncTime(clockMode: false)
+                                : null,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: connected
-                                  ? () => state.syncTime(clockMode: true)
-                                  : null,
-                              icon: const Icon(Icons.schedule, size: 18),
-                              label: const Text('0x20 时钟模式'),
-                            ),
+                          _CommandButton(
+                            code: '0x20',
+                            label: '时钟模式',
+                            onPressed: connected
+                                ? () => state.syncTime(clockMode: true)
+                                : null,
                           ),
                         ],
+                        footer: '时钟模式会整屏刷新以消除残影，建议只在需要时使用。',
                       ),
-                      const SizedBox(height: 8),
-                      Row(
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(height: 1),
+                      ),
+                      // 第二栏：常用指令（0x0X）。一行三个，字号比上面小一点，
+                      // 避免「0x02 清屏」被挤成两行。
+                      _CommandSection(
+                        title: '常用',
+                        compact: true,
                         children: <Widget>[
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed:
-                                  connected ? () => state.clearScreen() : null,
-                              icon: const Icon(Icons.cleaning_services_outlined,
-                                  size: 18),
-                              label: const Text('0x02 清屏'),
-                            ),
+                          _CommandButton(
+                            code: '0x02',
+                            label: '清屏',
+                            compact: true,
+                            onPressed:
+                                connected ? () => state.clearScreen() : null,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed:
-                                  connected ? () => state.refreshScreen() : null,
-                              icon: const Icon(Icons.refresh, size: 18),
-                              label: const Text('0x05 刷新'),
-                            ),
+                          _CommandButton(
+                            code: '0x05',
+                            label: '刷新',
+                            compact: true,
+                            onPressed:
+                                connected ? () => state.refreshScreen() : null,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed:
-                                  connected ? () => state.sleepDevice() : null,
-                              icon: const Icon(Icons.bedtime_outlined, size: 18),
-                              label: const Text('0x06 睡眠'),
-                            ),
+                          _CommandButton(
+                            code: '0x06',
+                            label: '睡眠',
+                            compact: true,
+                            onPressed:
+                                connected ? () => state.sleepDevice() : null,
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '时钟模式会整屏刷新以消除残影，建议只在需要时使用。',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
                       ),
                     ],
                   ),
@@ -162,6 +154,117 @@ class SendScreen extends StatelessWidget {
           DeviceStatusBar(state: state),
         ],
       ),
+    );
+  }
+}
+
+/// 设备指令里的一栏：小标题 + 一行按钮 + 可选的小字说明。
+///
+/// 每栏最多三列；[compact] 时字号小一点，用来塞下 0x0X 那三个常用指令。
+class _CommandSection extends StatelessWidget {
+  const _CommandSection({
+    required this.title,
+    required this.children,
+    this.footer,
+    this.compact = false,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final String? footer;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          title,
+          style: compact
+              ? theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+              : theme.textTheme.labelLarge
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            for (int i = 0; i < children.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: children[i]),
+            ],
+          ],
+        ),
+        if (footer != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(
+            footer!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 带指令编号的按钮：编号在上（等宽小字），名称在下，避免长中文被挤断行。
+class _CommandButton extends StatelessWidget {
+  const _CommandButton({
+    required this.code,
+    required this.label,
+    required this.onPressed,
+    this.filled = false,
+    this.compact = false,
+  });
+
+  final String code;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool filled;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          code,
+          style: (compact ? theme.textTheme.labelSmall : theme.textTheme.labelMedium)
+              ?.copyWith(
+            fontFamily: 'monospace',
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: compact ? theme.textTheme.labelLarge : theme.textTheme.bodyMedium,
+        ),
+      ],
+    );
+    final EdgeInsets padding = compact
+        ? const EdgeInsets.symmetric(horizontal: 4, vertical: 6)
+        : const EdgeInsets.symmetric(horizontal: 8, vertical: 8);
+
+    if (filled) {
+      return FilledButton.tonal(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(padding: padding),
+        child: content,
+      );
+    }
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(padding: padding),
+      child: content,
     );
   }
 }
