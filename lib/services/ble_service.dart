@@ -212,12 +212,14 @@ class ReactiveBleService implements EpdBleService {
   @override
   Future<List<AppPermissionStatus>> checkPermissions() async {
     // 一次问完所有权限的当前状态（不会弹窗）。
-    final Map<Permission, PermissionStatus> statuses =
-        await <Permission>[
+    // 注意：`List<Permission>` 上的 `.status` 来自 permission_handler 的扩展方法，
+    // 需要显式写成 `<Permission>[...].status`；这里拆成具名列表更清楚。
+    const List<Permission> permissions = <Permission>[
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
       Permission.locationWhenInUse,
-    ].status;
+    ];
+    final Map<Permission, PermissionStatus> statuses = await permissions.status;
 
     return <AppPermissionStatus>[
       AppPermissionStatus(
