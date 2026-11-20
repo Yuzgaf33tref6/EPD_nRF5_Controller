@@ -174,7 +174,11 @@ RgbaImage cropScaled({
 
 /// 判断裁剪矩形是否完全落在源图内（没有任何留空）。
 ///
-/// 裁剪页用它在「完成」按钮旁提示「有留空，会补白/补黑」。
+/// 判定按**采样点**来：矩形 `[left, left+width]` 内最后一个采样点大约是
+/// `left + width - step/2`（step 是采样步长）。这里用半个像素的容差近似，
+/// 即要求 `left >= -0.5` 且 `left + width <= 图片宽 + 0.5`。
+///
+/// 注意：整张图 `(0, 0, width, height)` 恰好落在边界上，算「没有留空」。
 bool cropRectFitsInside({
   required RgbaImage source,
   required double left,
@@ -182,8 +186,9 @@ bool cropRectFitsInside({
   required double width,
   required double height,
 }) {
-  return left >= -0.5 &&
-      top >= -0.5 &&
-      left + width <= source.width - 0.5 &&
-      top + height <= source.height - 0.5;
+  const double tolerance = 0.5;
+  return left >= -tolerance &&
+      top >= -tolerance &&
+      left + width <= source.width + tolerance &&
+      top + height <= source.height + tolerance;
 }

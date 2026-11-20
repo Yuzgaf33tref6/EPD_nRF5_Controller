@@ -88,8 +88,9 @@ void main() {
 
   group('cropScaled', () {
     test('取左半边得到纯黑，输出尺寸即画布尺寸', () {
-      // 采样点落在 x∈[0,1] 区间内，两侧都是黑，所以不会混到白。
-      // 注意 width=1 时步长 0.2，靠右的采样点 x 会逼近 1（仍 < 2，不跨列）。
+      // 采样点按 (i+0.5)*step-0.5 取，i=0 时恒为负；所以「让采样点全部不越界」
+      // 要求 left≈0.5-0.5*stepX。这里取的矩形刚好让 fx 落在 0.000..0.990、
+      // fy 落在 0.000..0.042，全都贴着源图左上角的黑色区域，故输出应全黑。
       final RgbaImage source = buildImage(
         4,
         4,
@@ -97,10 +98,10 @@ void main() {
       );
       final RgbaImage cropped = cropScaled(
         source: source,
-        left: 0,
-        top: 0,
-        width: 1,
-        height: 1,
+        left: 0.445,
+        top: 0.4958,
+        width: 1.1,
+        height: 0.05,
         outWidth: 10,
         outHeight: 6,
       );
@@ -108,9 +109,34 @@ void main() {
       expect(cropped.height, 6);
       for (int y = 0; y < 6; y++) {
         for (int x = 0; x < 10; x++) {
-          expect(pixelAt(cropped, x, y), <int>[0, 0, 0]);
+          expect(
+            pixelAt(cropped, x, y),
+            <int>[0, 0, 0],
+            reason: '输出 ($x, $y) 应当是黑，实际被补成了别的颜色',
+          );
         }
       }
+    });
+
+    test('裁剪矩形从原点开始时左侧会补底色（采样越界）', () {
+      // 这是 cropScaled 的既有语义：采样点 (i+0.5)*step-0.5 在 i=0 时为负，
+      // 落在源图外就填底色。裁剪页已改用 cover 模型避免这种情况，
+      // 这里只把行为钉住，防止将来无意改变。
+      final RgbaImage source =
+          buildImage(4, 4, (int x, int y) => <int>[0, 0, 0]);
+      final RgbaImage cropped = cropScaled(
+        source: source,
+        left: 0,
+        top: 0,
+        width: 2,
+        height: 2,
+        outWidth: 10,
+        outHeight: 10,
+      );
+      // 最左/最上一列采样点 < 0，被填成默认的白色底色。
+      expect(pixelAt(cropped, 0, 0), <int>[255, 255, 255]);
+      // 中间部位仍取到源图的黑。
+      expect(pixelAt(cropped, 5, 5), <int>[0, 0, 0]);
     });
 
     test('取右半边得到纯白', () {
@@ -179,9 +205,10 @@ void main() {
     });
 
     test('cropRectFitsInside 能分辨有没有留空', () {
-      // 10x10 的源图，按采样点是否落在 [-0.5, 9.5] 判断。
+      // 判定带半个像素的容差：矩形右/下边到「图片宽/高 + 0.5」为止都算没留空。
       final RgbaImage source =
           buildImage(10, 10, (int x, int y) => <int>[0, 0, 0]);
+      // 整张图：没有任何留空。
       expect(
         cropRectFitsInside(
           source: source,
@@ -192,6 +219,7 @@ void main() {
         ),
         isTrue,
       );
+      // 左边越界 1 像素：有留空。
       expect(
         cropRectFitsInside(
           source: source,
@@ -202,7 +230,7 @@ void main() {
         ),
         isFalse,
       );
-      // 右边越界也算留空。
+      // 右边越界：有留空。
       expect(
         cropRectFitsInside(
           source: source,
@@ -212,6 +240,17 @@ void main() {
           height: 10,
         ),
         isFalse,
+      );
+      // 小于半个像素的偏差仍算贴合（浮点误差容忍）。
+      expect(
+        cropRectFitsInside(
+          source: source,
+          left: -0.2,
+          top: -0.2,
+          width: 10.4,
+          height: 10.4,
+        ),
+        isTrue,
       );
     });
 

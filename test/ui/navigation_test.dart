@@ -72,14 +72,15 @@ void main() {
     await scrollTo(tester, find.text('扫描附近设备'));
     expect(find.text('扫描附近设备'), findsOneWidget);
 
-    // 折叠头按钮落在「扫描附近设备」上方：收起后按钮会消失，所以按折叠头
-    // 本身（含「连接设备」文字的那张卡）再点回去。用 warnIfMissed: false 是因为
-    // 卡头在滚动后可能部分被 AppBar 遮住。
-    await tester.tap(find.text('连接设备'), warnIfMissed: false);
+    // 折叠头是可点的 InkWell，标题「连接设备」在里面。滚到它可见再点，
+    // 免得点中被 AppBar 遮住的那一半。
+    await tester.ensureVisible(find.text('连接设备').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接设备').first, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsNothing);
 
-    await tester.tap(find.text('连接设备'), warnIfMissed: false);
+    await tester.tap(find.text('连接设备').first, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('扫描附近设备'), findsOneWidget);
   });

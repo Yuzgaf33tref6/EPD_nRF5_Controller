@@ -32,9 +32,11 @@ void main() {
   group('缩放', () {
     test('滚轮放大/缩小并夹在 1~5 之间', () {
       expect(cropViewZoomByWheel(1, zoomIn: true), closeTo(1.1, 1e-9));
-      expect(cropViewZoomByWheel(1.1, zoomIn: false), closeTo(0.99, 1e-9));
-      // 下限是 1，不会缩到比铺满更小（否则会露出空白）。
+      // 1 / 1.1 ≈ 0.909 < 下限 1，所以夹回 1 —— 这正是「不会缩到比铺满更小」。
       expect(cropViewZoomByWheel(1, zoomIn: false), 1);
+      // 从 2 缩小一次才看得出倍率生效：2 * 0.9 = 1.8。
+      expect(cropViewZoomByWheel(2, zoomIn: false), closeTo(1.8, 1e-9));
+      expect(cropViewZoomByWheel(1.2, zoomIn: false), closeTo(1.08, 1e-9));
       expect(cropViewZoomByWheel(4.9, zoomIn: true), 5);
     });
 
