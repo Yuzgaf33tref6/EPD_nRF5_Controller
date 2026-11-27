@@ -143,15 +143,25 @@ flutter build apk --release --split-per-abi \
 
 | workflow | 触发 | 内容 |
 | --- | --- | --- |
-| `ci.yml` | push / PR 到 `rebuild` | analyze + test + debug & release（仅 arm64），上传 APK 产物 |
+| `ci.yml` | push / PR 到 `v0.3.x`、`v0.2.x_main`、`main` | analyze + test + debug & release（仅 arm64），上传 APK 产物 |
 | `release.yml` | 打 `v*` tag | analyze + test + **全 ABI 仅 release**，生成 `SHA256SUMS.txt` 并发布 Release |
 
 发版流程：
 
 ```bash
 # 改 pubspec.yaml 的 version，提交后打 tag
-git tag v0.2.1 && git push origin v0.2.1
+git tag v0.3.0 && git push origin v0.3.0
 ```
+
+### 分支模型
+
+| 分支 | 用途 |
+| --- | --- |
+| `v0.3.x` | 当前开发分支（0.3 系列） |
+| `v0.2.x_main` | 0.2 系列稳定主线，只做补丁修复 |
+| `main` | 最初的手搓代码，只作考古参考 |
+
+版本线和分支一一对应：在哪个分支上打 tag，就出哪个系列的包。
 
 release 签名从仓库 Secrets 读取（`ANDROID_KEYSTORE_BASE64` 等 4 个），
 所以每次发布签名一致；keystore 不进仓库。
