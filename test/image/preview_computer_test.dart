@@ -205,12 +205,17 @@ void main() {
     });
 
     test('三档输出互不相同', () {
-      final RgbaImage original =
-          computeDitherJobSync(buildJob(stage: PreviewStage.original));
-      final RgbaImage processed =
-          computeDitherJobSync(buildJob(stage: PreviewStage.processed));
-      final RgbaImage dithered =
-          computeDitherJobSync(buildJob(stage: PreviewStage.dithered));
+      // 处理参数必须是非恒等的，否则「处理」档和「原图」档本来就该一样。
+      const ProcessSettings process = ProcessSettings(brightness: 24);
+      final RgbaImage original = computeDitherJobSync(
+        buildJob(stage: PreviewStage.original, process: process),
+      );
+      final RgbaImage processed = computeDitherJobSync(
+        buildJob(stage: PreviewStage.processed, process: process),
+      );
+      final RgbaImage dithered = computeDitherJobSync(
+        buildJob(stage: PreviewStage.dithered, process: process),
+      );
       expect(original.data, isNot(equals(processed.data)));
       expect(processed.data, isNot(equals(dithered.data)));
       expect(original.data, isNot(equals(dithered.data)));

@@ -591,6 +591,11 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     );
   }
 
+  /// 「处理中」遮罩。
+  ///
+  /// 这里刻意用**不会一直动**的沙漏图标而不是 [CircularProgressIndicator]：
+  /// 不确定进度条是无限动画，会让 `pumpAndSettle` 永远等不到静止
+  /// （widget 测试直接超时），而且它盖在页面上时整棵树的 ticker 都停不下来。
   Widget _buildBusyOverlay(ThemeData theme) {
     return Positioned.fill(
       child: GestureDetector(
@@ -607,10 +612,10 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    Icon(
+                      Icons.hourglass_bottom,
+                      size: 20,
+                      color: theme.colorScheme.primary,
                     ),
                     const SizedBox(width: 12),
                     Text('处理中 …', style: theme.textTheme.bodyMedium),

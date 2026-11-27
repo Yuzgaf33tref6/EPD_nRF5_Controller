@@ -9,17 +9,17 @@ void main() {
     test('正常响应解析出 tag / 标题 / 链接 / 发布时间', () {
       const String body = '''
 {
-  "tag_name": "v0.3.0",
-  "name": "EPD Controller 0.3.0",
-  "html_url": "https://github.com/Yuzgaf33tref6/EPD_nRF5_Controller/releases/tag/v0.3.0",
+  "tag_name": "v0.3.1",
+  "name": "EPD Controller 0.3.1",
+  "html_url": "https://github.com/Yuzgaf33tref6/EPD_nRF5_Controller/releases/tag/v0.3.1",
   "published_at": "2026-12-01T10:00:00Z"
 }''';
       final UpdateCheckResult result = UpdateChecker.parseLatestRelease(body);
       expect(result.error, isNull);
       expect(result.currentVersion, AppVersion.version);
-      expect(result.latestVersion, '0.3.0');
-      expect(result.releaseName, 'EPD Controller 0.3.0');
-      expect(result.releaseUrl, contains('/releases/tag/v0.3.0'));
+      expect(result.latestVersion, '0.3.1');
+      expect(result.releaseName, 'EPD Controller 0.3.1');
+      expect(result.releaseUrl, contains('/releases/tag/v0.3.1'));
       expect(result.publishedAt, '2026-12-01T10:00:00Z');
       expect(result.hasUpdate, isTrue);
     });

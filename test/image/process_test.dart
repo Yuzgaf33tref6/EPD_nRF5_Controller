@@ -202,10 +202,13 @@ void main() {
 
     test('整体偏暗的图会被提亮', () {
       final RgbaImage image = grayStrip(<int>[20, 40, 60, 80]);
-      final RgbaImage out = applyBrightnessBalance(image);
+      // apply* 系列是就地修改的（processImage 负责先 clone），所以要先取值。
       final int beforeMedian = pixelAt(image, 1, 0)[0];
+      final RgbaImage out = applyBrightnessBalance(image);
       final int afterMedian = pixelAt(out, 1, 0)[0];
       expect(afterMedian, greaterThan(beforeMedian));
+      // 亮度均衡的目标就是把中间调拉到 128 附近。
+      expect(afterMedian, closeTo(128, 8));
     });
   });
 
