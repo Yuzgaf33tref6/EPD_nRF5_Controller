@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../image/dither.dart';
-import '../image/preview_computer.dart';
 import '../image/process.dart';
+import '../image/preview_computer.dart';
 import '../image/rgba_image.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
@@ -12,47 +12,13 @@ import '../widgets/image_preview.dart';
 import 'canvas_editor_screen.dart';
 import 'crop_screen.dart';
 
-/// 老上位机（web 版）自带的算法，和它的 `ditherAlg` 选项一一对应。
-const List<DitherAlgorithm> _classicAlgorithms = <DitherAlgorithm>[
-  DitherAlgorithm.floydSteinberg,
-  DitherAlgorithm.atkinson,
-  DitherAlgorithm.stucki,
-  DitherAlgorithm.jarvis,
-  DitherAlgorithm.bayer,
-  DitherAlgorithm.none,
-];
-
-/// 0.3.0 新增的算法：误差扩散补全 + 更细腻的有序抖动。
-const List<DitherAlgorithm> _modernAlgorithms = <DitherAlgorithm>[
-  DitherAlgorithm.sierraLite,
-  DitherAlgorithm.burkes,
-  DitherAlgorithm.shiauFan,
-  DitherAlgorithm.shiauFan2,
-  DitherAlgorithm.bayer4x4,
-  DitherAlgorithm.blueNoise,
-];
-
-/// 是否是误差扩散类算法（只有这类算法受「蛇形扫描」开关影响）。
-bool _isErrorDiffusion(DitherAlgorithm algorithm) {
-  switch (algorithm) {
-    case DitherAlgorithm.bayer:
-    case DitherAlgorithm.bayer4x4:
-    case DitherAlgorithm.blueNoise:
-    case DitherAlgorithm.none:
-      return false;
-    default:
-      return true;
-  }
-}
-
-/// 图像发送页（二级）：画布预览 + 处理 + 抖动参数 + 导入/编辑 + 发送。
+/// 图像发送页（二级页面）。
 ///
-/// 流水线固定为 **原图 → 处理 → 抖动**：处理阶段调亮度/自动亮度/色彩简化，
-/// 抖动阶段把图压到墨水屏调色板。预览可以停在三档中的任意一步，方便对比
-/// 「哪一步把画面弄坏了」。
-///
-/// 这里会跑处理和抖动（400×300 图约百毫秒），所以做成独立页面按需进入，
-/// 不放在底部导航的一级页里；算式本身丢在后台 isolate（[PreviewComputer]）。
+/// 布局要点（0.3.0 调整）：
+/// - **预览固定在顶部**，只让下面的「处理 / 抖动 / 传图」滚动；
+/// - 「处理」「抖动」两张卡可折叠，默认展开，折叠状态不记忆；
+/// - 所有预览计算（处理 + 抖动）都在后台 isolate 里跑，超过 300ms 才弹
+///   「处理中」遮罩，避免用户以为界面卡死。
 class ImageSendScreen extends StatefulWidget {
   const ImageSendScreen({super.key});
 
@@ -61,7 +27,19 @@ class ImageSendScreen extends StatefulWidget {
 }
 
 class _ImageSendScreenState extends State<ImageSendScreen> {
-  /// 拖动滑块时先用局部值跟手，松开（或停顿 160ms）才真正提交，避免每帧整图重算。
+  // ---- 预览 ----
+  PreviewStage _stage = PreviewStage.dithered;
+  late final PreviewComputer _preview = PreviewComputer()
+    ..onResult = _onPreviewResult;
+  RgbaImage? _previewResult;
+  PreviewStage? _resultStage;
+  Object? _resultKey;
+  Object? _requestedKey;
+  Timer? _busyTimer;
+  bool _showBusy = false;
+  bool _disposed = false;
+
+  // ---- 滑块拖动中的临时值（让滑块跟手，不每次拖动都整图重算）----
   double? _pendingStrength;
   double? _pendingContrast;
   double? _pendingBrightness;
@@ -69,28 +47,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   Timer? _contrastDebounce;
   Timer? _brightnessDebounce;
 
-  /// 预览停在哪一档。
-  PreviewStage _stage = PreviewStage.dithered;
-
-  /// 后台算好的预览。为 null 时表示还没算完，先拿同步缓存顶上。
-  late final PreviewComputer _preview = PreviewComputer()
-    ..onResult = ((DitherJob job, RgbaImage image) {
-      if (!mounted || _disposed) {
-        return;
-      }
-      // 算的过程中可能已经切了档，这种过期结果直接丢。
-      if (job.stage != _stage) {
-        return;
-      }
-      setState(() {
-        _ditherResult = image;
-        _resultStage = job.stage;
-      });
-    });
-
-  RgbaImage? _ditherResult;
-  PreviewStage? _resultStage;
-  bool _disposed = false;
+  /// 弹「处理中」遮罩的阈值：低于这个时长用户感知不到，没必要闪一下。
+  static const Duration _busyThreshold = Duration(milliseconds: 300);
 
   @override
   void initState() {
@@ -101,6 +59,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   @override
   void dispose() {
     _disposed = true;
+    _busyTimer?.cancel();
     _strengthDebounce?.cancel();
     _contrastDebounce?.cancel();
     _brightnessDebounce?.cancel();
@@ -108,44 +67,64 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     super.dispose();
   }
 
-  /// 把当前参数丢给后台 isolate 算预览。
+  void _onPreviewResult(DitherJob job, RgbaImage image) {
+    if (!mounted || _disposed || job.stage != _stage) {
+      return;
+    }
+    setState(() {
+      _previewResult = image;
+      _resultStage = job.stage;
+      _resultKey = job.key;
+      _showBusy = false;
+    });
+    _busyTimer?.cancel();
+  }
+
+  /// 请求一次当前档位的预览计算。
   void _requestPreview() {
     final AppState? state = AppStateScope.maybeOf(context);
     if (state == null) {
       return;
     }
-    _preview.request(state.previewJob(_stage));
+    final DitherJob job = state.previewJob(_stage);
+    _requestedKey = job.key;
+    _preview.request(job);
+
+    _busyTimer?.cancel();
+    _busyTimer = Timer(_busyThreshold, () {
+      if (!mounted || _disposed) {
+        return;
+      }
+      if (_resultKey == _requestedKey) {
+        return;
+      }
+      setState(() => _showBusy = true);
+    });
   }
 
-  /// 当前该显示哪张图：优先后台结果（同档位），否则用同步缓存顶上。
+  /// 当前该显示的图：有本阶段结果就用结果，否则退回原图（**不要**在这里
+  /// 同步调用 `state.processedImage`，那正是原来的卡顿来源）。
   RgbaImage _previewFor(AppState state) {
-    if (_resultStage == _stage && _ditherResult != null) {
-      return _ditherResult!;
+    if (_resultStage == _stage && _previewResult != null) {
+      return _previewResult!;
     }
+    return state.sourceImage;
+  }
+
+  String get _previewTitle {
     return switch (_stage) {
-      PreviewStage.original => state.sourceImage,
-      PreviewStage.processed => state.processedImage,
-      PreviewStage.dithered => state.previewImage,
+      PreviewStage.original => '预览（原图）',
+      PreviewStage.processed => '预览（处理）',
+      PreviewStage.dithered => '预览（抖动后）',
     };
   }
-
-  String get _previewTitle => switch (_stage) {
-        PreviewStage.original => '预览（原图）',
-        PreviewStage.processed => '预览（处理）',
-        PreviewStage.dithered => '预览（抖动后）',
-      };
 
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
     final ThemeData theme = Theme.of(context);
     final RgbaImage preview = _previewFor(state);
-    // 参数一变就重新排队（相同入参会被 PreviewComputer 直接跳过）。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _requestPreview();
-      }
-    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('图像发送'),
@@ -153,358 +132,493 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
           IconButton(
             tooltip: '画布编辑',
             icon: const Icon(Icons.brush_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CanvasEditorScreen(),
+            onPressed: () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const CanvasEditorScreen(),
+                ),
+              );
+              _requestPreview();
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: <Widget>[
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              // 预览占上半部分的一个固定比例，剩下的留给可滚动的调整区。
+              final double previewHeight = (constraints.maxHeight * 0.42)
+                  .clamp(120.0, 300.0)
+                  .toDouble();
+              return Column(
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: _buildPreviewCard(
+                      state,
+                      theme,
+                      preview,
+                      previewHeight,
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                      children: <Widget>[
+                        _buildProcessCard(state, theme),
+                        const SizedBox(height: 12),
+                        _buildDitherCard(state, theme),
+                        const SizedBox(height: 12),
+                        _buildSendCard(state, theme),
+                      ],
+                    ),
+                  ),
+                  DeviceStatusBar(state: state),
+                ],
+              );
+            },
+          ),
+          if (_showBusy) _buildBusyOverlay(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewCard(
+    AppState state,
+    ThemeData theme,
+    RgbaImage preview,
+    double previewHeight,
+  ) {
+    return SectionCard(
+      title: _previewTitle,
+      icon: Icons.image_outlined,
+      trailing: SegmentedButton<PreviewStage>(
+        showSelectedIcon: false,
+        style: const ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        segments: <ButtonSegment<PreviewStage>>[
+          for (final PreviewStage stage in PreviewStage.values)
+            ButtonSegment<PreviewStage>(
+              value: stage,
+              label: Text(stage.label),
+            ),
+        ],
+        selected: <PreviewStage>{_stage},
+        onSelectionChanged: (Set<PreviewStage> selected) {
+          setState(() {
+            _stage = selected.first;
+            _showBusy = false;
+          });
+          _requestPreview();
+        },
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          // 高度固定：无论下面的调整区怎么滚，预览都待在原地不跳。
+          SizedBox(
+            height: previewHeight,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: preview.width / preview.height,
+                child: RepaintBoundary(
+                  child: RgbaImagePreview(image: preview, maxWidth: 400),
+                ),
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${state.driver.label} · ${state.colorMode.jsName} · '
+            '${preview.width}×${preview.height}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (!state.aspectMatchesCanvas)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '图片比例与画布不一致，抖动前建议重新裁剪。',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProcessCard(AppState state, ThemeData theme) {
+    return CollapsibleCard(
+      title: '处理',
+      icon: Icons.tune,
+      trailing: Text(
+        state.processSummary,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          DropdownButtonFormField<PreprocessPreset>(
+            initialValue: state.preprocess,
+            decoration: const InputDecoration(
+              labelText: '预处理效果',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: <DropdownMenuItem<PreprocessPreset>>[
+              for (final PreprocessPreset preset in PreprocessPreset.values)
+                DropdownMenuItem<PreprocessPreset>(
+                  value: preset,
+                  child: Text(preset.label),
+                ),
+            ],
+            onChanged: (PreprocessPreset? preset) {
+              if (preset == null) {
+                return;
+              }
+              state.setPreprocess(preset);
+              _requestPreview();
+            },
+          ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            value: state.brightnessBalance,
+            onChanged: (bool value) {
+              state.setBrightnessBalance(value);
+              _requestPreview();
+            },
+            title: const Text('亮度均衡'),
+            subtitle: const Text(
+              '分位裁剪定黑白点，并把中间调拉到中间；对大片白背景或整体偏暗的图更有效。',
+            ),
+          ),
+          _SliderRow(
+            label: '亮度',
+            value: _pendingBrightness ?? state.brightness,
+            min: -100,
+            max: 100,
+            divisions: 200,
+            display: formatBrightness(_pendingBrightness ?? state.brightness),
+            onChanged: (double value) {
+              setState(() => _pendingBrightness = value);
+              _brightnessDebounce?.cancel();
+              _brightnessDebounce = Timer(
+                const Duration(milliseconds: 160),
+                () => _commitBrightness(value),
+              );
+            },
+            onChangeEnd: _commitBrightness,
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                final double value = state.applyAutoBrightness();
+                setState(() => _pendingBrightness = null);
+                _requestPreview();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '自动亮度：亮度 ${formatBrightness(value)}',
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.auto_fix_high, size: 18),
+              label: const Text('自动亮度'),
+            ),
+          ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            value: state.simplifyColors,
+            onChanged: (bool value) {
+              state.setSimplifyColors(value);
+              _requestPreview();
+            },
+            title: const Text('色彩简化'),
+            subtitle: const Text(
+              '把整张图压到 N 色再抖动，能减少调色板边缘的反复横跳，但会改变观感。',
+            ),
+          ),
+          if (state.simplifyColors)
+            _SliderRow(
+              label: '色数',
+              value: state.simplifyColorCount.toDouble(),
+              min: 2,
+              max: 64,
+              divisions: 62,
+              display: '${state.simplifyColorCount}',
+              onChanged: (double value) {
+                state.setSimplifyColorCount(value.round());
+                _requestPreview();
+              },
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                state.resetProcess();
+                setState(() {
+                  _pendingBrightness = null;
+                });
+                _requestPreview();
+              },
+              icon: const Icon(Icons.restart_alt, size: 18),
+              label: const Text('恢复默认处理'),
             ),
           ),
         ],
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildDitherCard(AppState state, ThemeData theme) {
+    final List<_AlgorithmOption> options = _algorithmOptions;
+    final int selectedIndex = options.indexWhere(
+      (_AlgorithmOption option) => option.algorithm == state.algorithm,
+    );
+    final bool isDiffusion = _isErrorDiffusion(state.algorithm);
+
+    return CollapsibleCard(
+      title: '抖动',
+      icon: Icons.grain,
+      trailing: Text(
+        '强度 ${state.strength.toStringAsFixed(1)} · '
+        '对比 ${state.contrast.toStringAsFixed(1)}',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-              children: <Widget>[
-                SectionCard(
-                  title: _previewTitle,
-                  icon: Icons.image_outlined,
-                  trailing: SegmentedButton<PreviewStage>(
-                    showSelectedIcon: false,
-                    style: const ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    segments: <ButtonSegment<PreviewStage>>[
-                      for (final PreviewStage stage in PreviewStage.values)
-                        ButtonSegment<PreviewStage>(
-                          value: stage,
-                          label: Text(stage.label),
-                        ),
-                    ],
-                    selected: <PreviewStage>{_stage},
-                    onSelectionChanged: (Set<PreviewStage> value) {
-                      setState(() {
-                        _stage = value.first;
-                        // 换档后旧结果不再对应，先清掉避免看到上一档的画面。
-                        _ditherResult = null;
-                        _resultStage = null;
-                      });
-                      _requestPreview();
-                    },
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      RepaintBoundary(
-                        child: RgbaImagePreview(
-                          image: preview,
-                          maxWidth: 340,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${state.driver.label} · ${state.colorMode.jsName} · '
-                        '${preview.width}×${preview.height}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      if (!state.aspectMatchesCanvas)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            '当前图像比例与画布不符，建议导入图片后裁剪或旋转。',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.error,
-                            ),
-                          ),
-                        ),
-                    ],
+          DropdownButtonFormField<int>(
+            initialValue: selectedIndex < 0 ? 0 : selectedIndex,
+            decoration: const InputDecoration(
+              labelText: '抖动算法',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: <DropdownMenuItem<int>>[
+              for (int i = 0; i < options.length; i++)
+                DropdownMenuItem<int>(
+                  value: i,
+                  enabled: options[i].algorithm != null,
+                  child: Text(
+                    options[i].algorithm == null
+                        ? options[i].header!
+                        : _algorithmLabel(options[i].algorithm!),
                   ),
                 ),
-                const SizedBox(height: 12),
-                SectionCard(
-                  title: '处理',
-                  icon: Icons.tune,
-                  trailing: Text(
-                    state.processSummary,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: const Text('自动亮度'),
-                        subtitle: const Text(
-                          '按直方图拉伸黑白点，不改色相、不改构图。',
-                        ),
-                        value: state.autoBrightness,
-                        onChanged: (bool value) {
-                          state.setAutoBrightness(value);
-                          _requestPreview();
-                        },
-                      ),
-                      _SliderRow(
-                        label: '亮度',
-                        value: _pendingBrightness ?? state.brightness,
-                        min: -100,
-                        max: 100,
-                        divisions: 200,
-                        display: formatBrightness(
-                          _pendingBrightness ?? state.brightness,
-                        ),
-                        onChanged: (double value) {
-                          setState(() => _pendingBrightness = value);
-                          _brightnessDebounce?.cancel();
-                          _brightnessDebounce = Timer(
-                            const Duration(milliseconds: 160),
-                            () => _commitBrightness(value),
-                          );
-                        },
-                        onChangeEnd: _commitBrightness,
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: const Text('色彩简化'),
-                        subtitle: Text(
-                          '把整张图压到 ${state.simplifyColorCount} 色再抖动，'
-                          '色块感更强但更干净。',
-                        ),
-                        value: state.simplifyColors,
-                        onChanged: (bool value) {
-                          state.setSimplifyColors(value);
-                          _requestPreview();
-                        },
-                      ),
-                      if (state.simplifyColors)
-                        _SliderRow(
-                          label: '色数',
-                          value: state.simplifyColorCount.toDouble(),
-                          min: 2,
-                          max: 64,
-                          divisions: 62,
-                          display: '${state.simplifyColorCount}',
-                          onChanged: (double value) {
-                            state.setSimplifyColorCount(value.round());
-                            _requestPreview();
-                          },
-                        ),
-                      const SizedBox(height: 4),
-                      TextButton.icon(
-                        onPressed: () {
-                          state.resetProcess();
-                          _requestPreview();
-                        },
-                        icon: const Icon(Icons.restart_alt, size: 18),
-                        label: const Text('恢复默认处理'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SectionCard(
-                  title: '抖动',
-                  icon: Icons.grain,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '老上位机自带的算法',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          for (final DitherAlgorithm algorithm
-                              in _classicAlgorithms)
-                            _algorithmChip(state, algorithm),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '现代抖动（0.3.0 新增）',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          for (final DitherAlgorithm algorithm
-                              in _modernAlgorithms)
-                            _algorithmChip(state, algorithm),
-                        ],
-                      ),
-                      if (state.algorithm == DitherAlgorithm.blueNoise &&
-                          !state.noiseMaskReady) ...<Widget>[
-                        const SizedBox(height: 8),
-                        Text(
-                          state.noiseMaskLoading
-                              ? '正在加载蓝噪声纹理 …'
-                              : '蓝噪声纹理尚未就绪：暂时会用程序生成的散列噪声代替。',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        value: state.serpentine,
-                        onChanged: _isErrorDiffusion(state.algorithm)
-                            ? (bool value) {
-                                state.setSerpentine(value);
-                                _requestPreview();
-                              }
-                            : null,
-                        title: const Text('蛇形扫描'),
-                        subtitle: Text(
-                          _isErrorDiffusion(state.algorithm)
-                              ? '奇数行反向扫描，能减少斜向纹路；对误差扩散类算法有效。'
-                              : '只有误差扩散类算法支持蛇形扫描。',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      _SliderRow(
-                        label: '强度',
-                        value: _pendingStrength ?? state.strength,
-                        min: 0,
-                        max: 5,
-                        divisions: 50,
-                        display: (_pendingStrength ?? state.strength)
-                            .toStringAsFixed(1),
-                        onChanged: (double value) {
-                          setState(() => _pendingStrength = value);
-                          _strengthDebounce?.cancel();
-                          _strengthDebounce = Timer(
-                            const Duration(milliseconds: 160),
-                            () => _commitStrength(value),
-                          );
-                        },
-                        onChangeEnd: _commitStrength,
-                      ),
-                      _SliderRow(
-                        label: '对比度',
-                        value: _pendingContrast ?? state.contrast,
-                        min: 0.5,
-                        max: 2,
-                        divisions: 15,
-                        display: (_pendingContrast ?? state.contrast)
-                            .toStringAsFixed(1),
-                        onChanged: (double value) {
-                          setState(() => _pendingContrast = value);
-                          _contrastDebounce?.cancel();
-                          _contrastDebounce = Timer(
-                            const Duration(milliseconds: 160),
-                            () => _commitContrast(value),
-                          );
-                        },
-                        onChangeEnd: _commitContrast,
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          OutlinedButton.icon(
-                            onPressed: () => _importImage(state),
-                            icon: const Icon(Icons.add_photo_alternate_outlined,
-                                size: 18),
-                            label: const Text('导入图片'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              state.rotateSource();
-                              _requestPreview();
-                            },
-                            icon: const Icon(Icons.rotate_90_degrees_cw,
-                                size: 18),
-                            label: const Text('旋转画布'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              state.resetSource();
-                              _requestPreview();
-                            },
-                            icon: const Icon(Icons.restart_alt, size: 18),
-                            label: const Text('重置示例图'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SectionCard(
-                  title: '传图',
-                  icon: Icons.send_outlined,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Text(
-                        state.transferSummary,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'MTU ${state.mtu} · 每块 ${state.writeChunkBytes} 字节 · '
-                        '${state.speed.label}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      for (final String warning in state.warnings)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            warning,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 10),
-                      FilledButton.icon(
-                        onPressed: state.isConnected
-                            ? () => state.sendPreview()
-                            : null,
-                        icon: const Icon(Icons.send, size: 18),
-                        label: Text(state.isConnected
-                            ? '发送到设备'
-                            : '未连接设备，无法发送'),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '发送过程会逐条等待设备确认；整屏刷新需要 2~10 秒。',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            ],
+            onChanged: (int? index) {
+              if (index == null || index < 0 || index >= options.length) {
+                return;
+              }
+              final DitherAlgorithm? algorithm = options[index].algorithm;
+              if (algorithm == null) {
+                return;
+              }
+              state.setAlgorithm(algorithm);
+              _requestPreview();
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(
+              '适用范围：${_algorithmScope(state.algorithm)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          DeviceStatusBar(state: state),
+          if (state.algorithm == DitherAlgorithm.blueNoise &&
+              !state.noiseMaskReady)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                state.noiseMaskLoading
+                    ? '正在加载蓝噪声纹理 …'
+                    : '蓝噪声纹理尚未就绪：暂时用程序生成的散列噪声代替。',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            value: state.serpentine,
+            onChanged: isDiffusion
+                ? (bool value) {
+                    state.setSerpentine(value);
+                    _requestPreview();
+                  }
+                : null,
+            title: const Text('蛇形扫描'),
+            subtitle: Text(
+              isDiffusion
+                  ? '奇数行反向扫描再扩散，能明显打散单向推流产生的斜纹。'
+                  : '只对误差扩散类算法有效（有序抖动是逐像素独立的）。',
+            ),
+          ),
+          _SliderRow(
+            label: '强度',
+            value: _pendingStrength ?? state.strength,
+            min: 0,
+            max: 5,
+            divisions: 50,
+            display: (_pendingStrength ?? state.strength).toStringAsFixed(1),
+            onChanged: (double value) {
+              setState(() => _pendingStrength = value);
+              _strengthDebounce?.cancel();
+              _strengthDebounce = Timer(
+                const Duration(milliseconds: 160),
+                () => _commitStrength(value),
+              );
+            },
+            onChangeEnd: _commitStrength,
+          ),
+          _SliderRow(
+            label: '对比度',
+            value: _pendingContrast ?? state.contrast,
+            min: 0.5,
+            max: 2,
+            divisions: 15,
+            display: (_pendingContrast ?? state.contrast).toStringAsFixed(1),
+            onChanged: (double value) {
+              setState(() => _pendingContrast = value);
+              _contrastDebounce?.cancel();
+              _contrastDebounce = Timer(
+                const Duration(milliseconds: 160),
+                () => _commitContrast(value),
+              );
+            },
+            onChangeEnd: _commitContrast,
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () => _importImage(state),
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: const Text('导入图片'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  state.rotateSource();
+                  _requestPreview();
+                },
+                icon: const Icon(Icons.rotate_90_degrees_cw, size: 18),
+                label: const Text('旋转画布'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  state.resetSource();
+                  _requestPreview();
+                },
+                icon: const Icon(Icons.restart_alt, size: 18),
+                label: const Text('重置示例图'),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSendCard(AppState state, ThemeData theme) {
+    return SectionCard(
+      title: '传图',
+      icon: Icons.send_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            state.transferSummary,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'MTU ${state.mtu} · 每块 ${state.writeChunkBytes} 字节 · '
+            '${state.speed.label}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          for (final String warning in state.warnings)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                warning,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: state.isConnected ? () => state.sendPreview() : null,
+            icon: const Icon(Icons.send, size: 18),
+            label: Text(state.isConnected ? '发送到设备' : '未连接设备，无法发送'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '发送过程会逐条等待设备确认；整屏刷新需要 2~10 秒。',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusyOverlay(ThemeData theme) {
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () {},
+        child: ColoredBox(
+          color: Colors.black54,
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('处理中 …', style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -564,15 +678,42 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     );
   }
 
-  Widget _algorithmChip(AppState state, DitherAlgorithm algorithm) {
-    return ChoiceChip(
-      label: Text(_algorithmLabel(algorithm)),
-      selected: state.algorithm == algorithm,
-      onSelected: (bool _) {
-        state.setAlgorithm(algorithm);
-        _requestPreview();
-      },
-    );
+  /// 按「算法类型」分组的下拉选项（表头项 [algorithm] 为 null，不可选）。
+  List<_AlgorithmOption> get _algorithmOptions => <_AlgorithmOption>[
+        const _AlgorithmOption.header('── 误差扩散（照片 / 插画通用）──'),
+        const _AlgorithmOption.item(DitherAlgorithm.floydSteinberg),
+        const _AlgorithmOption.item(DitherAlgorithm.atkinson),
+        const _AlgorithmOption.item(DitherAlgorithm.stucki),
+        const _AlgorithmOption.item(DitherAlgorithm.jarvis),
+        const _AlgorithmOption.item(DitherAlgorithm.sierraLite),
+        const _AlgorithmOption.item(DitherAlgorithm.burkes),
+        const _AlgorithmOption.item(DitherAlgorithm.shiauFan),
+        const _AlgorithmOption.item(DitherAlgorithm.shiauFan2),
+        const _AlgorithmOption.header('── 有序抖动（网点风格）──'),
+        const _AlgorithmOption.item(DitherAlgorithm.bayer),
+        const _AlgorithmOption.item(DitherAlgorithm.bayer4x4),
+        const _AlgorithmOption.item(DitherAlgorithm.blueNoise),
+        const _AlgorithmOption.header('── 不抖动 ──'),
+        const _AlgorithmOption.item(DitherAlgorithm.none),
+      ];
+
+  bool _isErrorDiffusion(DitherAlgorithm algorithm) {
+    return switch (algorithm) {
+      DitherAlgorithm.floydSteinberg ||
+      DitherAlgorithm.atkinson ||
+      DitherAlgorithm.stucki ||
+      DitherAlgorithm.jarvis ||
+      DitherAlgorithm.sierraLite ||
+      DitherAlgorithm.burkes ||
+      DitherAlgorithm.shiauFan ||
+      DitherAlgorithm.shiauFan2 =>
+        true,
+      DitherAlgorithm.bayer ||
+      DitherAlgorithm.bayer4x4 ||
+      DitherAlgorithm.blueNoise ||
+      DitherAlgorithm.none =>
+        false,
+    };
   }
 
   String _algorithmLabel(DitherAlgorithm algorithm) {
@@ -591,6 +732,32 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       DitherAlgorithm.none => '不抖动',
     };
   }
+
+  String _algorithmScope(DitherAlgorithm algorithm) {
+    return switch (algorithm) {
+      DitherAlgorithm.floydSteinberg => '通用首选，照片和插画都稳，颗粒略细。',
+      DitherAlgorithm.atkinson => '高对比线条、文字；亮部细节会丢，复古 Mac 观感。',
+      DitherAlgorithm.stucki => '照片，颗粒比 Floyd 更小，但更慢。',
+      DitherAlgorithm.jarvis => '照片，过渡最平滑，速度最慢。',
+      DitherAlgorithm.sierraLite => '快速通用，边缘干净，算力最省。',
+      DitherAlgorithm.burkes => '照片，斜纹少、颗粒均匀。',
+      DitherAlgorithm.shiauFan => '文字、线条、图表（偏右扩散，保留笔画）。',
+      DitherAlgorithm.shiauFan2 => '暗部细节多的图：夜景、深色插画。',
+      DitherAlgorithm.bayer => '8×8 网点，复古网点感，适合渐变与图标。',
+      DitherAlgorithm.bayer4x4 => '4×4 网点，颗粒更粗，印刷海报感。',
+      DitherAlgorithm.blueNoise => '照片首选：没有规则网格，观感最接近连续调。',
+      DitherAlgorithm.none => '只适合纯色块或本身已是网点的图。',
+    };
+  }
+}
+
+/// 下拉框里的一项：要么是分组表头，要么是一个算法。
+class _AlgorithmOption {
+  const _AlgorithmOption.header(this.header) : algorithm = null;
+  const _AlgorithmOption.item(this.algorithm) : header = null;
+
+  final String? header;
+  final DitherAlgorithm? algorithm;
 }
 
 /// 一行「标签 + 滑块 + 数值」。

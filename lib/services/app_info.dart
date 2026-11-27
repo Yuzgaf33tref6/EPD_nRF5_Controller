@@ -11,10 +11,10 @@ class AppVersion {
   ///
   /// `test/app_version_test.dart` 会读 `pubspec.yaml` 校验两边一致，
   /// 忘记同步时 CI 会直接失败。
-  static const String version = '0.2.1';
+  static const String version = '0.3.0';
 
   /// 构建号，与 `pubspec.yaml` 里 `version: x.y.z+N` 的 N 一致。
-  static const int buildNumber = 3;
+  static const int buildNumber = 4;
 
   /// 完整版本串，例如 `0.2.0+2`。
   static String get fullVersion => '$version+$buildNumber';
@@ -94,6 +94,21 @@ class ReleaseNote {
 
 /// 全部更新日志，最新在前。
 const List<ReleaseNote> kReleaseNotes = <ReleaseNote>[
+  ReleaseNote(
+    version: '0.3.0',
+    date: '2026-11-28',
+    highlights: <String>[
+      '新增 6 种现代抖动：Sierra Lite、Burkes、Shiau-Fan、Shiau-Fan 2、Bayer 4×4、蓝噪声。',
+      '新增「蛇形扫描」：误差扩散类算法可奇数行反向扩散，明显打散单向推流产生的斜纹。',
+      '图像发送页支持「原图 → 处理 → 抖动」三档预览，处理与抖动分层可调。',
+      '处理新增预处理预设（动态照片 / 鲜明插画 / 柔和渐变 / 灰阶照片 / 旧照片修复 / 纸张与海报）。',
+      '自动亮度改为一键按钮：把等效亮度直接写进亮度滑块，符合图像软件惯例。',
+      '新增「亮度均衡」开关：分位裁剪定黑白点并把中间调拉到中间，高调/低调图更有效（默认关）。',
+      '抖动的处理与调整分卡折叠，预览固定在顶部，滚动时不会跑掉；计算超过 300ms 才显示「处理中」。',
+      '色彩简化的卡顿修复：所有预览计算都放到后台 isolate，不再阻塞界面。',
+      '测试构建的版本号改为 0.3.0-test.<构建号>，正式版仍是 0.3.0，便于区分安装包。',
+    ],
+  ),
   ReleaseNote(
     version: '0.2.1',
     date: '2026-11-20',

@@ -759,14 +759,38 @@ void main() {
   });
 
   group('处理阶段', () {
-    test('默认只开自动亮度', () {
+    test('默认什么都不处理', () {
       final AppState state = buildState();
       addTearDown(state.dispose);
-      expect(state.autoBrightness, isTrue);
       expect(state.brightness, 0);
+      expect(state.brightnessBalance, isFalse);
+      expect(state.preprocess, PreprocessPreset.none);
       expect(state.simplifyColors, isFalse);
       expect(state.simplifyColorCount, 8);
-      expect(state.processSummary, '自动亮度');
+      expect(state.processSummary, '不处理');
+    });
+
+    test('任意处理参数都会参与 process 与摘要', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      state.setBrightnessBalance(true);
+      state.setPreprocess(PreprocessPreset.vividPhoto);
+      state.setBrightness(-12);
+      expect(state.process.brightnessBalance, isTrue);
+      expect(state.process.preprocess, PreprocessPreset.vividPhoto);
+      expect(state.processSummary, '动态照片 · 亮度均衡 · 亮度 -12');
+      state.setPreprocess(PreprocessPreset.none);
+      state.setBrightnessBalance(false);
+      expect(state.processSummary, '亮度 -12');
+    });
+
+    test('自动亮度按钮会把等效亮度写进滑块', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      // 示例图偏亮/偏暗取决于渐变与色块，这里只要求「算出有限值并写入」。
+      final double value = state.applyAutoBrightness();
+      expect(value, inInclusiveRange(-100, 100));
+      expect(state.brightness, value);
     });
 
     test('改处理参数会影响预览，并在恢复默认后回到原样', () {

@@ -84,12 +84,20 @@ jobs:
         run: flutter test
 
       # 只编 arm64-v8a：现在的手机基本全是 arm64，其它架构纯属白占体积。
+      #
+      # 版本号覆盖成 `0.3.0-test.<run_number>`：CI 产物是**测试包**，装上后
+      # 系统设置里能一眼看出是第几次构建的测试版，不会和正式发布版混淆。
+      # 正式版由 release.yml 用 pubspec.yaml 里的版本号构建。
       - name: Build debug APK (arm64 only)
-        run: flutter build apk --debug --target-platform android-arm64
+        run: >-
+          flutter build apk --debug --target-platform android-arm64
+          --build-name=0.3.0-test --build-number=${{ github.run_number }}
 
       # release 走 AOT，且 build.gradle.kts 里开了 R8 代码压缩 + 资源裁剪。
       - name: Build release APK (arm64 only, R8 optimized)
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        run: >-
+          flutter build apk --release --target-platform android-arm64 --split-per-abi
+          --build-name=0.3.0-test --build-number=${{ github.run_number }}
 
       - name: Show APK sizes
         run: ls -lh build/app/outputs/flutter-apk/

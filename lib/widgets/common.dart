@@ -274,3 +274,89 @@ class EmptyHint extends StatelessWidget {
     );
   }
 }
+
+/// 可折叠的分组卡片：点标题展开/收起，**默认展开**。
+///
+/// 折叠状态只保存在本组件的 state 里（用户要求「不记忆、不自动折叠」），
+/// 页面重建或重启 App 都会回到展开状态。
+class CollapsibleCard extends StatefulWidget {
+  const CollapsibleCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.icon,
+    this.trailing,
+    this.initiallyExpanded = true,
+  });
+
+  final String title;
+  final Widget child;
+  final IconData? icon;
+
+  /// 标题右侧的附加信息（例如处理摘要文案）。
+  final Widget? trailing;
+
+  final bool initiallyExpanded;
+
+  @override
+  State<CollapsibleCard> createState() => _CollapsibleCardState();
+}
+
+class _CollapsibleCardState extends State<CollapsibleCard> {
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: <Widget>[
+                  if (widget.icon != null) ...<Widget>[
+                    Icon(
+                      widget.icon,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  if (widget.trailing != null) widget.trailing!,
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0 : -0.25,
+                    duration: const Duration(milliseconds: 150),
+                    child: Icon(
+                      Icons.expand_more,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 12, 14),
+              child: widget.child,
+            ),
+        ],
+      ),
+    );
+  }
+}

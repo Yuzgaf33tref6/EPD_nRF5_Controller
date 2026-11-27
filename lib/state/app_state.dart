@@ -227,8 +227,9 @@ class AppState extends ChangeNotifier {
   bool _noiseMaskLoading = false;
 
   // ---- 处理阶段（原图 → 处理 → 抖动）----
-  bool _autoBrightness = true;
   double _brightness = 0;
+  bool _brightnessBalance = false;
+  PreprocessPreset _preprocess = PreprocessPreset.none;
   bool _simplifyColors = false;
   int _simplifyColorCount = 8;
 
@@ -332,14 +333,16 @@ class AppState extends ChangeNotifier {
 
   /// 处理阶段的参数。
   ProcessSettings get process => ProcessSettings(
-        autoBrightness: _autoBrightness,
         brightness: _brightness,
+        brightnessBalance: _brightnessBalance,
+        preprocess: _preprocess,
         simplifyColors: _simplifyColors,
         simplifyColorCount: _simplifyColorCount,
       );
 
-  bool get autoBrightness => _autoBrightness;
   double get brightness => _brightness;
+  bool get brightnessBalance => _brightnessBalance;
+  PreprocessPreset get preprocess => _preprocess;
   bool get simplifyColors => _simplifyColors;
   int get simplifyColorCount => _simplifyColorCount;
 
@@ -1438,12 +1441,45 @@ class AppState extends ChangeNotifier {
 
   // ---- 处理阶段（原图 → 处理 → 抖动）----
 
-  /// 是否做自动亮度（直方图拉伸）。
-  void setAutoBrightness(bool value) {
-    if (value == _autoBrightness) {
+  /// 「自动亮度」按钮：算出一个等效的亮度补偿并写进亮度滑块。
+  ///
+  /// 为什么是一个按钮而不是开关：直方图拉伸是一条曲线，没法用单个滑块
+  /// 表示；按图像软件的惯例，「自动」类操作就是**帮你把滑块摆好**。
+  /// 需要真正的曲线归一时用「亮度均衡」开关。
+  ///
+  /// 返回计算出的亮度值，方便界面提示。
+  double applyAutoBrightness() {
+    // 在「不含手动亮度」的当前处理结果上估算，避免和上一次的值叠加。
+    final RgbaImage base = processImage(
+      _sourceImage,
+      process.copyWith(brightness: 0),
+    );
+    final double value = estimateAutoBrightness(base);
+    setBrightness(value);
+    addLog(
+      LogLevel.info,
+      '自动亮度：亮度调整为 ${formatBrightness(value)}',
+    );
+    return value;
+  }
+
+  /// 是否做「亮度均衡」（分位裁剪 + 中位亮度对齐）。
+  void setBrightnessBalance(bool value) {
+    if (value == _brightnessBalance) {
       return;
     }
-    _autoBrightness = value;
+    _brightnessBalance = value;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 预处理预设。
+  void setPreprocess(PreprocessPreset preset) {
+    if (preset == _preprocess) {
+      return;
+    }
+    _preprocess = preset;
     _invalidatePreview();
     _persistSettings();
     notifyListeners();
@@ -1485,16 +1521,18 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 恢复处理阶段的默认值（只做自动亮度）。
+  /// 恢复处理阶段的默认值（全部不处理）。
   void resetProcess() {
-    if (_autoBrightness &&
-        _brightness == 0 &&
+    if (_brightness == 0 &&
+        !_brightnessBalance &&
+        _preprocess == PreprocessPreset.none &&
         !_simplifyColors &&
         _simplifyColorCount == 8) {
       return;
     }
-    _autoBrightness = true;
     _brightness = 0;
+    _brightnessBalance = false;
+    _preprocess = PreprocessPreset.none;
     _simplifyColors = false;
     _simplifyColorCount = 8;
     _invalidatePreview();
@@ -1694,8 +1732,9 @@ class AppState extends ChangeNotifier {
         'lastDeviceId': _lastDeviceId,
         'lastDeviceName': _lastDeviceName,
         'driverWarningMuted': _driverWarningMuted,
-        'autoBrightness': _autoBrightness,
         'brightness': _brightness,
+        'brightnessBalance': _brightnessBalance,
+        'preprocess': _preprocess.name,
         'simplifyColors': _simplifyColors,
         'simplifyColorCount': _simplifyColorCount,
         'serpentine': _serpentine,
@@ -1800,14 +1839,23 @@ class AppState extends ChangeNotifier {
     }
 
     // ---- 处理阶段 ----
-    final Object? autoBrightness = data['autoBrightness'];
-    if (autoBrightness is bool) {
-      _autoBrightness = autoBrightness;
-    }
     final Object? brightness = data['brightness'];
     if (brightness is num) {
       final double value = brightness.toDouble();
       _brightness = value < -100 ? -100 : (value > 100 ? 100 : value);
+    }
+    final Object? brightnessBalance = data['brightnessBalance'];
+    if (brightnessBalance is bool) {
+      _brightnessBalance = brightnessBalance;
+    }
+    final Object? preprocess = data['preprocess'];
+    if (preprocess is String) {
+      for (final PreprocessPreset preset in PreprocessPreset.values) {
+        if (preset.name == preprocess) {
+          _preprocess = preset;
+          break;
+        }
+      }
     }
     final Object? simplifyColors = data['simplifyColors'];
     if (simplifyColors is bool) {

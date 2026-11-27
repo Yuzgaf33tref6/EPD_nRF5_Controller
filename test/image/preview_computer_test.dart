@@ -105,7 +105,7 @@ void main() {
         buildJob().key,
         isNot(equals(
           buildJob(
-            process: const ProcessSettings(autoBrightness: false),
+            process: const ProcessSettings(brightness: 12),
           ).key,
         )),
       );
