@@ -8,7 +8,6 @@
 /// 现算一次要几百毫秒且不稳定；内置一张 4 KB 的纹理是业界常规做法。
 library;
 
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
