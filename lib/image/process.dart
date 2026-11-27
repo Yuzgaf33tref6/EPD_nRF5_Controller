@@ -53,7 +53,7 @@ class ProcessSettings {
   }
 
   /// 用于缓存判断；必须覆盖所有会影响输出的字段。
-  Object get key => Object.hash(
+  int get key => Object.hash(
         autoBrightness,
         brightness,
         simplifyColors,
