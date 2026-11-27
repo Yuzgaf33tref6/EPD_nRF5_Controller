@@ -6,6 +6,7 @@
 /// 而重排运算，否则个别像素会偏 1。
 library;
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'color_space.dart';
@@ -129,6 +130,15 @@ enum DitherAlgorithm {
   /// 是目前公认观感最好的一种有序抖动。
   blueNoise('blueNoise'),
 
+  // ---- 0.3.0 新增：其它 ----
+
+  /// Riemersma：沿 Hilbert 曲线做误差扩散（误差队列 16 个、几何衰减加权）。
+  /// 没有逐行扩散的方向性，渐变最干净，代价是比 Floyd 慢一倍左右。
+  riemersma('riemersma'),
+
+  /// 自动推荐：按图像内容挑一个合适的算法（见 [resolveAutoAlgorithm]）。
+  auto('auto'),
+
   /// 不做抖动，直接量化。
   none('none');
 
@@ -165,6 +175,19 @@ RgbaImage ditherImage(
   Uint8List? noiseMask,
   int noiseMaskEdge = kBlueNoiseEdge,
 }) {
+  if (algorithm == DitherAlgorithm.auto) {
+    // 自动推荐：先看内容，再递归交给真正选中的算法。
+    return ditherImage(
+      image,
+      resolveAutoAlgorithm(image),
+      strength,
+      mode,
+      serpentine: serpentine,
+      noiseMask: noiseMask,
+      noiseMaskEdge: noiseMaskEdge,
+    );
+  }
+
   // 误差扩散：蛇形扫描时统一走通用扩散引擎（老算法优先保留逐行版本，
   // 因为它是和 web 版逐字节对拍的基准，不能动）。
   final List<DiffusionTap>? taps = _diffusionKernels[algorithm];
@@ -199,6 +222,8 @@ RgbaImage ditherImage(
         final int threshold = _noiseThreshold(noiseMask, edge, x, y);
         return threshold.toDouble();
       });
+    case DitherAlgorithm.riemersma:
+      return _riemersma(image, strength, mode);
     case DitherAlgorithm.none:
       return image;
     default:
@@ -758,4 +783,180 @@ Uint8List syntheticNoiseMask({int edge = kBlueNoiseEdge}) {
     mask[i] = _noiseThreshold(null, size, i % size, i ~/ size);
   }
   return mask;
+}
+
+// ---------------------------------------------------------------------------
+// Riemersma：沿 Hilbert 曲线做误差扩散
+// ---------------------------------------------------------------------------
+
+/// Riemersma 的误差队列长度。16 个已经能消掉方向性，再长收益很小。
+const int kRiemersmaQueueLength = 16;
+
+/// 队列权重：按几何级数衰减再归一化（越"近"的像素分摊越多误差）。
+final List<double> _riemersmaWeights = () {
+  const double decay = 0.125;
+  final List<double> raw = <double>[
+    for (int i = 0; i < kRiemersmaQueueLength; i++)
+      math.pow(decay, i / (kRiemersmaQueueLength - 1)).toDouble(),
+  ];
+  final double total = raw.fold(0.0, (double a, double b) => a + b);
+  return <double>[for (final double w in raw) w / total];
+}();
+
+/// 把 1 维的 Hilbert 索引还原成 2 维坐标（标准的 d2xy 算法）。
+(int, int) _hilbertIndexToPoint(int order, int d) {
+  int x = 0;
+  int y = 0;
+  int t = d;
+  for (int s = 1; s < order; s *= 2) {
+    final int rx = 1 & (t ~/ 2);
+    final int ry = 1 & (t ^ rx);
+    if (ry == 0) {
+      if (rx == 1) {
+        x = s - 1 - x;
+        y = s - 1 - y;
+      }
+      final int swap = x;
+      x = y;
+      y = swap;
+    }
+    x += s * rx;
+    y += s * ry;
+    t ~/= 4;
+  }
+  return (x, y);
+}
+
+/// 按 Hilbert 曲线顺序遍历整幅图的像素下标（越界部分跳过）。
+///
+/// 曲线走的是 [长边] 向上取整到 2 的幂的正方形，因此非正方形的图会有空洞，
+/// 跳过即可 —— 这仍然是空间连续的顺序，误差扩散的方向性比逐行扫描小得多。
+List<int> hilbertPixelOrder(int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return const <int>[];
+  }
+  int order = 1;
+  final int longest = width > height ? width : height;
+  while (order < longest) {
+    order <<= 1;
+  }
+  final List<int> pixels = <int>[];
+  final int cells = order * order;
+  for (int d = 0; d < cells; d++) {
+    final (int x, int y) = _hilbertIndexToPoint(order, d);
+    if (x >= width || y >= height) {
+      continue;
+    }
+    pixels.add(y * width + x);
+  }
+  return pixels;
+}
+
+/// Riemersma 抖动：误差不再"往右/往下"推，而是沿 Hilbert 曲线把最近若干个
+/// 像素的残差按几何衰减的权重摊回去，所以渐变里看不到斜纹或网格。
+RgbaImage _riemersma(RgbaImage image, double strength, EpdColorMode mode) {
+  final int width = image.width;
+  final int height = image.height;
+  if (width == 0 || height == 0) {
+    return image;
+  }
+  final Uint8List data = image.data;
+  final List<int> order = hilbertPixelOrder(width, height);
+  final Float64List queue = Float64List(kRiemersmaQueueLength * 3);
+  final List<double> weights = _riemersmaWeights;
+  final int slots = kRiemersmaQueueLength;
+  int slot = 0;
+
+  for (final int pixel in order) {
+    final int idx = pixel * 4;
+    final int srcR = data[idx];
+    final int srcG = data[idx + 1];
+    final int srcB = data[idx + 2];
+
+    double errR = 0;
+    double errG = 0;
+    double errB = 0;
+    for (int k = 0; k < slots; k++) {
+      final int at = ((slot - 1 - k) % slots + slots) % slots;
+      final double w = weights[k];
+      errR += w * queue[at * 3];
+      errG += w * queue[at * 3 + 1];
+      errB += w * queue[at * 3 + 2];
+    }
+
+    final double r = (srcR + errR).clamp(0.0, 255.0).toDouble();
+    final double g = (srcG + errG).clamp(0.0, 255.0).toDouble();
+    final double b = (srcB + errB).clamp(0.0, 255.0).toDouble();
+
+    final EpdColor closest = findClosestColor(r, g, b, mode);
+    data[idx] = closest.r;
+    data[idx + 1] = closest.g;
+    data[idx + 2] = closest.b;
+
+    queue[slot * 3] = (r - closest.r) * strength;
+    queue[slot * 3 + 1] = (g - closest.g) * strength;
+    queue[slot * 3 + 2] = (b - closest.b) * strength;
+    slot = (slot + 1) % slots;
+  }
+
+  return image;
+}
+
+// ---------------------------------------------------------------------------
+// 自动推荐
+// ---------------------------------------------------------------------------
+
+/// 自动推荐：按图像内容挑算法（[DitherAlgorithm.auto] 会调用它）。
+///
+/// 规则刻意做得简单、可解释：
+/// - **接近灰阶**（平均彩度 < 10）：用 [DitherAlgorithm.blueNoise] —— 没有
+///   网格感，灰阶过渡最细腻；
+/// - **高对比 / 线条类**（亮度标准差 > 68）：用 [DitherAlgorithm.shiauFan] ——
+///   核偏右，笔画和边缘保留得最好；
+/// - **大幅彩色照片**（像素 ≥ 12 万）：用 [DitherAlgorithm.burkes] —— 颗粒
+///   均匀、斜纹少，速度也够；
+/// - 其余（小图、彩色插画）：用 [DitherAlgorithm.riemersma]。
+DitherAlgorithm resolveAutoAlgorithm(RgbaImage image) {
+  final int pixels = image.width * image.height;
+  if (pixels == 0) {
+    return DitherAlgorithm.floydSteinberg;
+  }
+  final Uint8List data = image.data;
+  double lumaSum = 0;
+  double lumaSquareSum = 0;
+  double satSum = 0;
+  int count = 0;
+  for (int i = 0; i + 3 < data.length; i += 4) {
+    if (data[i + 3] == 0) {
+      continue;
+    }
+    final int r = data[i];
+    final int g = data[i + 1];
+    final int b = data[i + 2];
+    final int luma = (299 * r + 587 * g + 114 * b) ~/ 1000;
+    final int maxChannel = math.max(r, math.max(g, b));
+    final int minChannel = math.min(r, math.min(g, b));
+    lumaSum += luma;
+    lumaSquareSum += luma * luma;
+    satSum += maxChannel - minChannel;
+    count++;
+  }
+  if (count == 0) {
+    return DitherAlgorithm.floydSteinberg;
+  }
+  final double meanLuma = lumaSum / count;
+  final double variance = (lumaSquareSum / count) - meanLuma * meanLuma;
+  final double stdLuma = variance > 0 ? math.sqrt(variance) : 0;
+  final double meanSaturation = satSum / count;
+
+  if (meanSaturation < 10) {
+    return DitherAlgorithm.blueNoise;
+  }
+  if (stdLuma > 68) {
+    return DitherAlgorithm.shiauFan;
+  }
+  if (pixels >= 120000) {
+    return DitherAlgorithm.burkes;
+  }
+  return DitherAlgorithm.riemersma;
 }

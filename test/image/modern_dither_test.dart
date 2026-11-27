@@ -34,6 +34,18 @@ RgbaImage buildFlat(int width, int height, int value) {
   return RgbaImage(width, height, data);
 }
 
+/// 纯彩色平涂图（彩度够大、亮度方差为 0），用来喂自动推荐的判定。
+RgbaImage flatColorImage(int width, int height) {
+  final Uint8List data = Uint8List(width * height * 4);
+  for (int i = 0; i < width * height; i++) {
+    data[i * 4] = 150;
+    data[i * 4 + 1] = 120;
+    data[i * 4 + 2] = 60;
+    data[i * 4 + 3] = 255;
+  }
+  return RgbaImage(width, height, data);
+}
+
 List<int> pixelAt(RgbaImage image, int x, int y) {
   final int index = (y * image.width + x) * 4;
   return <int>[
@@ -259,6 +271,104 @@ void main() {
       );
       expectPaletteOnly(first, EpdColorMode.threeColor);
       expect(first.data, equals(second.data));
+    });
+  });
+
+  group('Riemersma 与自动推荐', () {
+    test('Hilbert 顺序覆盖每个像素且不重复（含非正方形）', () {
+      for (final (int w, int h) in <(int, int)>[(5, 3), (8, 8), (13, 7)]) {
+        final List<int> order = hilbertPixelOrder(w, h);
+        expect(order.length, w * h, reason: '${w}x$h 应覆盖全部像素');
+        expect(order.toSet().length, w * h, reason: '${w}x$h 不应重复');
+        expect(order.every((int i) => i >= 0 && i < w * h), isTrue);
+      }
+      expect(hilbertPixelOrder(0, 5), isEmpty);
+    });
+
+    test('Riemersma 只输出调色板颜色且可复现', () {
+      final RgbaImage first = ditherImage(
+        buildGradient(24, 18),
+        DitherAlgorithm.riemersma,
+        1.0,
+        EpdColorMode.threeColor,
+      );
+      final RgbaImage second = ditherImage(
+        buildGradient(24, 18),
+        DitherAlgorithm.riemersma,
+        1.0,
+        EpdColorMode.threeColor,
+      );
+      expectPaletteOnly(first, EpdColorMode.threeColor);
+      expect(first.data, equals(second.data));
+    });
+
+    test('Riemersma 与 Floyd 结果不同（不是换名的同一算法）', () {
+      final RgbaImage riemersma = ditherImage(
+        buildGradient(20, 16),
+        DitherAlgorithm.riemersma,
+        1.0,
+        EpdColorMode.blackWhiteColor,
+      );
+      final RgbaImage floyd = ditherImage(
+        buildGradient(20, 16),
+        DitherAlgorithm.floydSteinberg,
+        1.0,
+        EpdColorMode.blackWhiteColor,
+      );
+      expect(riemersma.data, isNot(equals(floyd.data)));
+    });
+
+    test('自动推荐按内容挑算法', () {
+      // 纯灰 → 蓝噪声
+      expect(
+        resolveAutoAlgorithm(buildGradient(16, 16)),
+        DitherAlgorithm.blueNoise,
+      );
+
+      // 高对比彩色（暗蓝 / 亮黄两色，彩度大、亮度跨度大）→ Shiau-Fan
+      final RgbaImage highContrast = RgbaImage(16, 16);
+      for (int i = 0; i < 16 * 16; i++) {
+        final bool dark = i % 2 == 0;
+        highContrast.data[i * 4] = dark ? 0 : 250;
+        highContrast.data[i * 4 + 1] = dark ? 0 : 250;
+        highContrast.data[i * 4 + 2] = dark ? 120 : 80;
+        highContrast.data[i * 4 + 3] = 255;
+      }
+      expect(resolveAutoAlgorithm(highContrast), DitherAlgorithm.shiauFan);
+
+      // 大幅彩色照片（400×320 = 12.8 万像素）→ Burkes
+      expect(
+        resolveAutoAlgorithm(flatColorImage(400, 320)),
+        DitherAlgorithm.burkes,
+      );
+
+      // 小尺寸彩色图 → Riemersma
+      expect(
+        resolveAutoAlgorithm(flatColorImage(40, 30)),
+        DitherAlgorithm.riemersma,
+      );
+
+      // 全透明图有兜底
+      expect(
+        resolveAutoAlgorithm(RgbaImage(1, 1)),
+        DitherAlgorithm.floydSteinberg,
+      );
+    });
+
+    test('选自动推荐时输出与它挑中的算法完全一致', () {
+      final RgbaImage auto = ditherImage(
+        buildGradient(20, 16),
+        DitherAlgorithm.auto,
+        1.0,
+        EpdColorMode.threeColor,
+      );
+      final RgbaImage picked = ditherImage(
+        buildGradient(20, 16),
+        resolveAutoAlgorithm(buildGradient(20, 16)),
+        1.0,
+        EpdColorMode.threeColor,
+      );
+      expect(auto.data, equals(picked.data));
     });
   });
 

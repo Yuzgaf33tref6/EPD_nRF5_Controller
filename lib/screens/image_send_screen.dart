@@ -444,7 +444,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
               ),
             ),
           ),
-          if (state.algorithm == DitherAlgorithm.blueNoise &&
+          if ((state.algorithm == DitherAlgorithm.blueNoise ||
+                  state.algorithm == DitherAlgorithm.auto) &&
               !state.noiseMaskReady)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -680,6 +681,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
 
   /// 按「算法类型」分组的下拉选项（表头项 [algorithm] 为 null，不可选）。
   List<_AlgorithmOption> get _algorithmOptions => <_AlgorithmOption>[
+        const _AlgorithmOption.header('── 自动 ──'),
+        const _AlgorithmOption.item(DitherAlgorithm.auto),
         const _AlgorithmOption.header('── 误差扩散（照片 / 插画通用）──'),
         const _AlgorithmOption.item(DitherAlgorithm.floydSteinberg),
         const _AlgorithmOption.item(DitherAlgorithm.atkinson),
@@ -689,6 +692,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
         const _AlgorithmOption.item(DitherAlgorithm.burkes),
         const _AlgorithmOption.item(DitherAlgorithm.shiauFan),
         const _AlgorithmOption.item(DitherAlgorithm.shiauFan2),
+        const _AlgorithmOption.item(DitherAlgorithm.riemersma),
         const _AlgorithmOption.header('── 有序抖动（网点风格）──'),
         const _AlgorithmOption.item(DitherAlgorithm.bayer),
         const _AlgorithmOption.item(DitherAlgorithm.bayer4x4),
@@ -708,6 +712,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       DitherAlgorithm.shiauFan ||
       DitherAlgorithm.shiauFan2 =>
         true,
+      DitherAlgorithm.riemersma ||
+      DitherAlgorithm.auto ||
       DitherAlgorithm.bayer ||
       DitherAlgorithm.bayer4x4 ||
       DitherAlgorithm.blueNoise ||
@@ -718,6 +724,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
 
   String _algorithmLabel(DitherAlgorithm algorithm) {
     return switch (algorithm) {
+      DitherAlgorithm.auto => '自动推荐（看内容挑）',
       DitherAlgorithm.floydSteinberg => 'Floyd–Steinberg（默认）',
       DitherAlgorithm.atkinson => 'Atkinson',
       DitherAlgorithm.stucki => 'Stucki',
@@ -727,6 +734,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       DitherAlgorithm.burkes => 'Burkes',
       DitherAlgorithm.shiauFan => 'Shiau-Fan',
       DitherAlgorithm.shiauFan2 => 'Shiau-Fan 2',
+      DitherAlgorithm.riemersma => 'Riemersma（Hilbert）',
       DitherAlgorithm.bayer4x4 => 'Bayer 4×4',
       DitherAlgorithm.blueNoise => '蓝噪声',
       DitherAlgorithm.none => '不抖动',
@@ -746,6 +754,10 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       DitherAlgorithm.bayer => '8×8 网点，复古网点感，适合渐变与图标。',
       DitherAlgorithm.bayer4x4 => '4×4 网点，颗粒更粗，印刷海报感。',
       DitherAlgorithm.blueNoise => '照片首选：没有规则网格，观感最接近连续调。',
+      DitherAlgorithm.riemersma =>
+        '分辨率高、渐变多的照片：沿 Hilbert 曲线扩散，毫无方向性，但最慢。',
+      DitherAlgorithm.auto => '按内容自动挑：灰阶→蓝噪声，高对比→Shiau-Fan，'
+          '大照片→Burkes，小图→Riemersma。',
       DitherAlgorithm.none => '只适合纯色块或本身已是网点的图。',
     };
   }

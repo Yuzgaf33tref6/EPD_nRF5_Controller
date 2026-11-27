@@ -1367,8 +1367,10 @@ class AppState extends ChangeNotifier {
       return;
     }
     _algorithm = algorithm;
-    if (algorithm == DitherAlgorithm.blueNoise) {
+    if (algorithm == DitherAlgorithm.blueNoise ||
+        algorithm == DitherAlgorithm.auto) {
       // 蓝噪声需要那 4 KB 阈值表；第一次选中时在后台加载，不阻塞界面。
+      // 自动推荐也可能落到蓝噪声，所以一并提前加载。
       unawaited(loadNoiseMask());
     }
     notifyListeners();
@@ -1874,7 +1876,8 @@ class AppState extends ChangeNotifier {
       _serpentine = serpentine;
     }
     // 蓝噪声掩膜不持久化（4 KB 字节数组没必要进 JSON），启动后按需加载。
-    if (_algorithm == DitherAlgorithm.blueNoise) {
+    if (_algorithm == DitherAlgorithm.blueNoise ||
+        _algorithm == DitherAlgorithm.auto) {
       unawaited(loadNoiseMask());
     }
 
