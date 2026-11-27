@@ -4,13 +4,18 @@ import 'package:flutter/foundation.dart';
 
 import 'dither.dart';
 import 'epd_color.dart';
+import 'process.dart';
 import 'rgba_image.dart';
 
-/// 抖动计算的入参。必须全部是「可跨 isolate 传递」的值类型。
+/// 预览计算的入参。必须全部是「可跨 isolate 传递」的值类型。
 ///
 /// 之所以不直接传 `RgbaImage` 对象：`compute` 要求入参和返回值都能在 isolate 之间
 /// 传递，实体类虽然多数情况下可以，但这里显式把 RGBA 字节拆出来传，行为更可预期，
 /// 也方便单测（无 Flutter 环境也能算）。
+///
+/// 流水线：**原图 → 处理（自动亮度 / 亮度 / 色彩简化）→ 抖动**。
+/// [stage] 决定算到哪一步停：`original` 直接返回原图，`processed` 停在做完处理，
+/// `dithered` 再往下跑对比度与抖动。
 @immutable
 class DitherJob {
   const DitherJob({
@@ -21,6 +26,8 @@ class DitherJob {
     required this.strength,
     required this.contrast,
     required this.mode,
+    this.process = ProcessSettings.defaults,
+    this.stage = PreviewStage.dithered,
   });
 
   final int width;
@@ -31,6 +38,12 @@ class DitherJob {
   final double contrast;
   final EpdColorMode mode;
 
+  /// 处理阶段的参数。
+  final ProcessSettings process;
+
+  /// 算到哪一步停。
+  final PreviewStage stage;
+
   /// 标识这份入参的键，用来判断结果是否还有效。
   Object get key => Object.hash(
         width,
@@ -39,7 +52,21 @@ class DitherJob {
         strength,
         contrast,
         mode,
+        process.key,
+        stage,
         _hashBytes(rgba),
+      );
+
+  DitherJob copyWith({PreviewStage? stage}) => DitherJob(
+        width: width,
+        height: height,
+        rgba: rgba,
+        algorithm: algorithm,
+        strength: strength,
+        contrast: contrast,
+        mode: mode,
+        process: process,
+        stage: stage ?? this.stage,
       );
 }
 
@@ -56,11 +83,11 @@ int _hashBytes(Uint8List bytes) {
   return hash ^ bytes.length;
 }
 
-/// 在**后台 isolate** 里算抖动预览。
+/// 在**后台 isolate** 里算预览。
 ///
-/// 这是「一进预览页就卡」的正面解法：对比度 + 抖动要遍历 12 万像素、每个像素还要
-/// 跟调色板做一次 Lab 距离比较，跑在主 isolate 上必然掉帧。放到后台后，
-/// UI 线程只负责画已经转好的贴图，滑块拖动期间界面依然跟手。
+/// 这是「一进预览页就卡」的正面解法：处理 + 对比度 + 抖动要遍历 12 万像素、
+/// 每个像素还要跟调色板做一次 Lab 距离比较，跑在主 isolate 上必然掉帧。
+/// 放到后台后，UI 线程只负责画已经转好的贴图，滑块拖动期间界面依然跟手。
 class PreviewComputer {
   PreviewComputer();
 
@@ -73,8 +100,11 @@ class PreviewComputer {
   bool _running = false;
   bool _disposed = false;
 
-  /// 结果回调。每次算完都会带结果调用一次。
-  void Function(RgbaImage image)? onResult;
+  /// 结果回调。每次算完都会带「这次算的是哪个请求」一起调用一次。
+  ///
+  /// 带上 [DitherJob] 是为了让界面能判断结果是否还对应现在选中的档位：
+  /// 算的过程中用户可能已经切到别的档了，那种结果要丢掉。
+  void Function(DitherJob job, RgbaImage image)? onResult;
 
   /// 提交一次计算请求。相同的入参会被跳过；正在算时新请求会覆盖掉排队的那个。
   void request(DitherJob job) {
@@ -103,7 +133,7 @@ class PreviewComputer {
         }
         _lastResult = result;
         _lastKey = job.key;
-        onResult?.call(result);
+        onResult?.call(job, result);
       }
     } finally {
       _running = false;
@@ -120,13 +150,22 @@ class PreviewComputer {
 }
 
 /// 顶层函数，供 [compute] 在 isolate 里执行。
+///
+/// 阶段：原图 → 处理 → （对比度）→ 抖动。
 RgbaImage _runDitherJob(DitherJob job) {
-  final RgbaImage image = RgbaImage(
+  final RgbaImage base = RgbaImage(
     job.width,
     job.height,
     Uint8List.fromList(job.rgba),
   );
-  RgbaImage out = adjustContrast(image, job.contrast);
+  if (job.stage == PreviewStage.original) {
+    return base;
+  }
+  RgbaImage out = processImage(base, job.process);
+  if (job.stage == PreviewStage.processed) {
+    return out;
+  }
+  out = adjustContrast(out, job.contrast);
   out = ditherImage(out, job.algorithm, job.strength, job.mode);
   return out;
 }

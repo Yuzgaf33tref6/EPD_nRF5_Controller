@@ -111,9 +111,11 @@ void main() {
     await switchTab(tester, 1);
 
     await tapAfterScroll(tester, find.text('图像发送'));
-    // 预览卡片的标题会随「抖动 / 原图」开关变化，所以用前缀匹配。
+    // 预览卡片的标题会随「原图 / 处理 / 抖动」三档切换，所以用前缀匹配。
     expect(find.textContaining('预览（'), findsOneWidget);
     expect(find.text('抖动'), findsWidgets);
+    // 处理阶段的卡片（自动亮度 / 亮度 / 色彩简化）应当在一屏内能看到标题。
+    expect(find.text('处理'), findsWidgets);
 
     await tester.tap(find.byTooltip('画布编辑'));
     await tester.pumpAndSettle();

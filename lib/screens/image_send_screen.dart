@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../image/dither.dart';
 import '../image/preview_computer.dart';
+import '../image/process.dart';
 import '../image/rgba_image.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
@@ -11,10 +12,14 @@ import '../widgets/image_preview.dart';
 import 'canvas_editor_screen.dart';
 import 'crop_screen.dart';
 
-/// 图像发送页（二级）：画布预览 + 抖动参数 + 导入/编辑 + 发送。
+/// 图像发送页（二级）：画布预览 + 处理 + 抖动参数 + 导入/编辑 + 发送。
 ///
-/// 这里会跑抖动与位打包（400×300 图约百毫秒），所以做成独立页面按需进入，
-/// 不放在底部导航的一级页里。
+/// 流水线固定为 **原图 → 处理 → 抖动**：处理阶段调亮度/自动亮度/色彩简化，
+/// 抖动阶段把图压到墨水屏调色板。预览可以停在三档中的任意一步，方便对比
+/// 「哪一步把画面弄坏了」。
+///
+/// 这里会跑处理和抖动（400×300 图约百毫秒），所以做成独立页面按需进入，
+/// 不放在底部导航的一级页里；算式本身丢在后台 isolate（[PreviewComputer]）。
 class ImageSendScreen extends StatefulWidget {
   const ImageSendScreen({super.key});
 
@@ -26,22 +31,33 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   /// 拖动滑块时先用局部值跟手，松开（或停顿 160ms）才真正提交，避免每帧整图重算。
   double? _pendingStrength;
   double? _pendingContrast;
+  double? _pendingBrightness;
   Timer? _strengthDebounce;
   Timer? _contrastDebounce;
+  Timer? _brightnessDebounce;
 
-  /// 预览显示原图还是抖动后的效果。
-  bool _showDither = true;
+  /// 预览停在哪一档。
+  PreviewStage _stage = PreviewStage.dithered;
 
-  /// 后台算好的抖动预览。为 null 时表示还没算完，先拿同步缓存顶上。
+  /// 后台算好的预览。为 null 时表示还没算完，先拿同步缓存顶上。
   late final PreviewComputer _preview = PreviewComputer()
-    ..onResult = ((RgbaImage image) {
-      if (!mounted) {
+    ..onResult = ((DitherJob job, RgbaImage image) {
+      if (!mounted || _disposed) {
         return;
       }
-      setState(() => _ditherResult = image);
+      // 算的过程中可能已经切了档，这种过期结果直接丢。
+      if (job.stage != _stage) {
+        return;
+      }
+      setState(() {
+        _ditherResult = image;
+        _resultStage = job.stage;
+      });
     });
 
   RgbaImage? _ditherResult;
+  PreviewStage? _resultStage;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -51,8 +67,10 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
 
   @override
   void dispose() {
+    _disposed = true;
     _strengthDebounce?.cancel();
     _contrastDebounce?.cancel();
+    _brightnessDebounce?.cancel();
     _preview.dispose();
     super.dispose();
   }
@@ -63,25 +81,38 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     if (state == null) {
       return;
     }
-    _preview.request(state.currentDitherJob);
+    _preview.request(state.previewJob(_stage));
   }
+
+  /// 当前该显示哪张图：优先后台结果（同档位），否则用同步缓存顶上。
+  RgbaImage _previewFor(AppState state) {
+    if (_resultStage == _stage && _ditherResult != null) {
+      return _ditherResult!;
+    }
+    return switch (_stage) {
+      PreviewStage.original => state.sourceImage,
+      PreviewStage.processed => state.processedImage,
+      PreviewStage.dithered => state.previewImage,
+    };
+  }
+
+  String get _previewTitle => switch (_stage) {
+        PreviewStage.original => '预览（原图）',
+        PreviewStage.processed => '预览（处理）',
+        PreviewStage.dithered => '预览（抖动后）',
+      };
 
   @override
   Widget build(BuildContext context) {
     final AppState state = AppStateScope.of(context);
     final ThemeData theme = Theme.of(context);
-    // 后台结果优先；还没算好时用同步缓存，保证界面有东西显示。
-    final RgbaImage preview = _showDither
-        ? (_ditherResult ?? state.previewImage)
-        : state.sourceImage;
+    final RgbaImage preview = _previewFor(state);
     // 参数一变就重新排队（相同入参会被 PreviewComputer 直接跳过）。
-    if (_showDither) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _requestPreview();
-        }
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _requestPreview();
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         title: const Text('图像发送'),
@@ -104,21 +135,30 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
               children: <Widget>[
                 SectionCard(
-                  title: _showDither ? '预览（抖动后）' : '预览（原图）',
+                  title: _previewTitle,
                   icon: Icons.image_outlined,
-                  trailing: SegmentedButton<bool>(
+                  trailing: SegmentedButton<PreviewStage>(
                     showSelectedIcon: false,
                     style: const ButtonStyle(
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    segments: const <ButtonSegment<bool>>[
-                      ButtonSegment<bool>(value: true, label: Text('抖动')),
-                      ButtonSegment<bool>(value: false, label: Text('原图')),
+                    segments: <ButtonSegment<PreviewStage>>[
+                      for (final PreviewStage stage in PreviewStage.values)
+                        ButtonSegment<PreviewStage>(
+                          value: stage,
+                          label: Text(stage.label),
+                        ),
                     ],
-                    selected: <bool>{_showDither},
-                    onSelectionChanged: (Set<bool> value) {
-                      setState(() => _showDither = value.first);
+                    selected: <PreviewStage>{_stage},
+                    onSelectionChanged: (Set<PreviewStage> value) {
+                      setState(() {
+                        _stage = value.first;
+                        // 换档后旧结果不再对应，先清掉避免看到上一档的画面。
+                        _ditherResult = null;
+                        _resultStage = null;
+                      });
+                      _requestPreview();
                     },
                   ),
                   child: Column(
@@ -147,6 +187,90 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                             ),
                           ),
                         ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SectionCard(
+                  title: '处理',
+                  icon: Icons.tune,
+                  trailing: Text(
+                    state.processSummary,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text('自动亮度'),
+                        subtitle: const Text(
+                          '按直方图拉伸黑白点，不改色相、不改构图。',
+                        ),
+                        value: state.autoBrightness,
+                        onChanged: (bool value) {
+                          state.setAutoBrightness(value);
+                          _requestPreview();
+                        },
+                      ),
+                      _SliderRow(
+                        label: '亮度',
+                        value: _pendingBrightness ?? state.brightness,
+                        min: -100,
+                        max: 100,
+                        divisions: 200,
+                        display: formatBrightness(
+                          _pendingBrightness ?? state.brightness,
+                        ),
+                        onChanged: (double value) {
+                          setState(() => _pendingBrightness = value);
+                          _brightnessDebounce?.cancel();
+                          _brightnessDebounce = Timer(
+                            const Duration(milliseconds: 160),
+                            () => _commitBrightness(value),
+                          );
+                        },
+                        onChangeEnd: _commitBrightness,
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text('色彩简化'),
+                        subtitle: Text(
+                          '把整张图压到 ${state.simplifyColorCount} 色再抖动，'
+                          '色块感更强但更干净。',
+                        ),
+                        value: state.simplifyColors,
+                        onChanged: (bool value) {
+                          state.setSimplifyColors(value);
+                          _requestPreview();
+                        },
+                      ),
+                      if (state.simplifyColors)
+                        _SliderRow(
+                          label: '色数',
+                          value: state.simplifyColorCount.toDouble(),
+                          min: 2,
+                          max: 64,
+                          divisions: 62,
+                          display: '${state.simplifyColorCount}',
+                          onChanged: (double value) {
+                            state.setSimplifyColorCount(value.round());
+                            _requestPreview();
+                          },
+                        ),
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: () {
+                          state.resetProcess();
+                          _requestPreview();
+                        },
+                        icon: const Icon(Icons.restart_alt, size: 18),
+                        label: const Text('恢复默认处理'),
+                      ),
                     ],
                   ),
                 ),
@@ -324,6 +448,16 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     _requestPreview();
   }
 
+  void _commitBrightness(double value) {
+    _brightnessDebounce?.cancel();
+    final AppState state = AppStateScope.of(context);
+    state.setBrightness(value);
+    if (mounted) {
+      setState(() => _pendingBrightness = null);
+    }
+    _requestPreview();
+  }
+
   Future<void> _importImage(AppState state) async {
     final RgbaImage? picked = await state.pickImageFromGallery();
     if (picked == null || !mounted) {
@@ -403,7 +537,7 @@ class _SliderRow extends StatelessWidget {
           ),
         ),
         SizedBox(
-          width: 40,
+          width: 44,
           child: Text(
             display,
             textAlign: TextAlign.end,

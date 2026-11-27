@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:epd_controller/image/dither.dart';
 import 'package:epd_controller/image/epd_color.dart';
 import 'package:epd_controller/image/preview_computer.dart';
+import 'package:epd_controller/image/process.dart';
 import 'package:epd_controller/image/rgba_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -27,6 +28,8 @@ DitherJob buildJob({
   double strength = 1.0,
   double contrast = 1.2,
   EpdColorMode mode = EpdColorMode.threeColor,
+  ProcessSettings process = ProcessSettings.defaults,
+  PreviewStage stage = PreviewStage.dithered,
 }) {
   final RgbaImage image = buildImage(24, 16);
   return DitherJob(
@@ -37,6 +40,8 @@ DitherJob buildJob({
     strength: strength,
     contrast: contrast,
     mode: mode,
+    process: process,
+    stage: stage,
   );
 }
 
@@ -73,6 +78,21 @@ void main() {
       );
     });
 
+    test('处理参数或预览档位不同，key 也会变', () {
+      expect(
+        buildJob().key,
+        isNot(equals(
+          buildJob(
+            process: const ProcessSettings(autoBrightness: false),
+          ).key,
+        )),
+      );
+      expect(
+        buildJob().key,
+        isNot(equals(buildJob(stage: PreviewStage.processed).key)),
+      );
+    });
+
     test('图像内容变化会导致 key 变化', () {
       final RgbaImage a = buildImage(10, 10);
       final RgbaImage b = a.clone();
@@ -87,6 +107,15 @@ void main() {
             mode: EpdColorMode.threeColor,
           );
       expect(job(a).key, isNot(equals(job(b).key)));
+    });
+
+    test('copyWith 只换档位', () {
+      final DitherJob job = buildJob();
+      final DitherJob copy = job.copyWith(stage: PreviewStage.original);
+      expect(copy.stage, PreviewStage.original);
+      expect(copy.algorithm, job.algorithm);
+      expect(copy.process, job.process);
+      expect(copy.rgba, same(job.rgba));
     });
   });
 
@@ -116,19 +145,53 @@ void main() {
       expect(job.rgba, equals(before));
     });
 
-    test('none 算法等价于只做对比度调整', () {
+    test('none 算法等价于「处理 + 对比度」两步', () {
       final DitherJob job = buildJob(algorithm: DitherAlgorithm.none);
       final RgbaImage result = computeDitherJobSync(job);
-      // 对比度 1.0 时应当与源图完全一致（用同样的路径算一遍做对照）。
       final RgbaImage reference = RgbaImage(
         job.width,
         job.height,
         Uint8List.fromList(job.rgba),
       );
-      final RgbaImage expected =
-          ditherImage(adjustContrast(reference, job.contrast),
-              DitherAlgorithm.none, job.strength, job.mode);
+      final RgbaImage expected = ditherImage(
+        adjustContrast(
+          processImage(reference, job.process),
+          job.contrast,
+        ),
+        DitherAlgorithm.none,
+        job.strength,
+        job.mode,
+      );
       expect(result.data, equals(expected.data));
+    });
+
+    test('原图档直接返回输入像素', () {
+      final DitherJob job = buildJob(stage: PreviewStage.original);
+      final RgbaImage result = computeDitherJobSync(job);
+      expect(result.data, equals(job.rgba));
+    });
+
+    test('处理档只处理不抖动', () {
+      final DitherJob job = buildJob(stage: PreviewStage.processed);
+      final RgbaImage result = computeDitherJobSync(job);
+      final RgbaImage reference = RgbaImage(
+        job.width,
+        job.height,
+        Uint8List.fromList(job.rgba),
+      );
+      expect(result.data, equals(processImage(reference, job.process).data));
+    });
+
+    test('三档输出互不相同', () {
+      final RgbaImage original =
+          computeDitherJobSync(buildJob(stage: PreviewStage.original));
+      final RgbaImage processed =
+          computeDitherJobSync(buildJob(stage: PreviewStage.processed));
+      final RgbaImage dithered =
+          computeDitherJobSync(buildJob(stage: PreviewStage.dithered));
+      expect(original.data, isNot(equals(processed.data)));
+      expect(processed.data, isNot(equals(dithered.data)));
+      expect(original.data, isNot(equals(dithered.data)));
     });
   });
 }

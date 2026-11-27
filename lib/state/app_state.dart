@@ -24,6 +24,7 @@ import '../image/crop_geometry.dart';
 import '../image/dither.dart';
 import '../image/epd_color.dart';
 import '../image/preview_computer.dart';
+import '../image/process.dart';
 import '../image/rgba_image.dart';
 import '../image/sample_image.dart';
 import '../models/transfer_speed.dart';
@@ -217,8 +218,16 @@ class AppState extends ChangeNotifier {
   double _strength = 1.0;
   double _contrast = 1.2;
 
+  // ---- 处理阶段（原图 → 处理 → 抖动）----
+  bool _autoBrightness = true;
+  double _brightness = 0;
+  bool _simplifyColors = false;
+  int _simplifyColorCount = 8;
+
   RgbaImage? _previewCache;
   Object? _previewCacheKey;
+  RgbaImage? _processedCache;
+  Object? _processedCacheKey;
   ImageTransferPlan? _planCache;
   Object? _planCacheKey;
 
@@ -313,6 +322,22 @@ class AppState extends ChangeNotifier {
   double get strength => _strength;
   double get contrast => _contrast;
 
+  /// 处理阶段的参数。
+  ProcessSettings get process => ProcessSettings(
+        autoBrightness: _autoBrightness,
+        brightness: _brightness,
+        simplifyColors: _simplifyColors,
+        simplifyColorCount: _simplifyColorCount,
+      );
+
+  bool get autoBrightness => _autoBrightness;
+  double get brightness => _brightness;
+  bool get simplifyColors => _simplifyColors;
+  int get simplifyColorCount => _simplifyColorCount;
+
+  /// 处理阶段的短描述，给界面显示用。
+  String get processSummary => describeProcess(process);
+
   /// 驱动选择方式。
   DriverSelectionMode get driverMode => _driverMode;
 
@@ -390,19 +415,35 @@ class AppState extends ChangeNotifier {
         .join(' ');
   }
 
-  /// 抖动后的预览图。按参数做缓存，参数没变就不重算。
+  /// 只经过「处理」阶段、还没抖动的图。界面的「处理」预览档用它。
+  ///
+  /// 同步版本，参数没变时有缓存；界面上仍建议走后台 isolate。
+  RgbaImage get processedImage {
+    final Object key =
+        Object.hash(_sourceImage, process.key, _sourceImage.width, _sourceImage.height);
+    final RgbaImage? cached = _processedCache;
+    if (cached != null && _processedCacheKey == key) {
+      return cached;
+    }
+    final RgbaImage image = processImage(_sourceImage, process);
+    _processedCache = image;
+    _processedCacheKey = key;
+    return image;
+  }
+
+  /// 抖动后的预览图（= 处理 + 对比度 + 抖动）。按参数做缓存，参数没变就不重算。
   ///
   /// **注意**：这是**同步**版本，会占用当前线程算完（400×300 约几十毫秒）。
   /// 界面上的实时预览请用 `previewComputer`（后台 isolate）算出来的结果，
   /// 只有「发送」这种本来就该等的地方才调这里。
   RgbaImage get previewImage {
     final Object key = Object.hash(_sourceImage, _algorithm, _strength,
-        _contrast, colorMode, _sourceImage.width, _sourceImage.height);
+        _contrast, colorMode, process.key, _sourceImage.width, _sourceImage.height);
     final RgbaImage? cached = _previewCache;
     if (cached != null && _previewCacheKey == key) {
       return cached;
     }
-    RgbaImage image = _sourceImage.clone();
+    RgbaImage image = processImage(_sourceImage, process);
     image = adjustContrast(image, _contrast);
     image = ditherImage(image, _algorithm, _strength, colorMode);
     _previewCache = image;
@@ -410,8 +451,10 @@ class AppState extends ChangeNotifier {
     return image;
   }
 
-  /// 当前抖动用参数。界面把它交给 [PreviewComputer] 去后台算，避免卡顿。
-  DitherJob get currentDitherJob => DitherJob(
+  /// 当前抖动/处理用参数。界面把它交给 [PreviewComputer] 去后台算，避免卡顿。
+  ///
+  /// [stage] 决定算到哪一步：原图 / 只处理 / 处理+抖动。
+  DitherJob previewJob(PreviewStage stage) => DitherJob(
         width: _sourceImage.width,
         height: _sourceImage.height,
         rgba: _sourceImage.data,
@@ -419,7 +462,12 @@ class AppState extends ChangeNotifier {
         strength: _strength,
         contrast: _contrast,
         mode: colorMode,
+        process: process,
+        stage: stage,
       );
+
+  /// 抖动阶段的完整参数（默认按「抖动」档算）。
+  DitherJob get currentDitherJob => previewJob(PreviewStage.dithered);
 
   /// 当前参数下应发送的完整写指令序列（真算出来的）。
   ///
@@ -1317,6 +1365,72 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- 处理阶段（原图 → 处理 → 抖动）----
+
+  /// 是否做自动亮度（直方图拉伸）。
+  void setAutoBrightness(bool value) {
+    if (value == _autoBrightness) {
+      return;
+    }
+    _autoBrightness = value;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 手动亮度补偿，-100 ~ 100（会夹取）。
+  void setBrightness(double value) {
+    final double clamped =
+        value < -100 ? -100 : (value > 100 ? 100 : value);
+    if (clamped == _brightness) {
+      return;
+    }
+    _brightness = clamped;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 是否做色彩简化。
+  void setSimplifyColors(bool value) {
+    if (value == _simplifyColors) {
+      return;
+    }
+    _simplifyColors = value;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 色彩简化的目标颜色数，2 ~ 64（会夹取）。
+  void setSimplifyColorCount(int value) {
+    final int clamped = value < 2 ? 2 : (value > 64 ? 64 : value);
+    if (clamped == _simplifyColorCount) {
+      return;
+    }
+    _simplifyColorCount = clamped;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
+  /// 恢复处理阶段的默认值（只做自动亮度）。
+  void resetProcess() {
+    if (_autoBrightness &&
+        _brightness == 0 &&
+        !_simplifyColors &&
+        _simplifyColorCount == 8) {
+      return;
+    }
+    _autoBrightness = true;
+    _brightness = 0;
+    _simplifyColors = false;
+    _simplifyColorCount = 8;
+    _invalidatePreview();
+    _persistSettings();
+    notifyListeners();
+  }
+
   void setMtu(int value) {
     final int clamped = value < 20 ? 20 : (value > 247 ? 247 : value);
     if (clamped == _mtu) {
@@ -1414,6 +1528,8 @@ class AppState extends ChangeNotifier {
   void _invalidatePreview() {
     _previewCache = null;
     _previewCacheKey = null;
+    _processedCache = null;
+    _processedCacheKey = null;
     _planCache = null;
     _planCacheKey = null;
   }
@@ -1507,6 +1623,10 @@ class AppState extends ChangeNotifier {
         'lastDeviceId': _lastDeviceId,
         'lastDeviceName': _lastDeviceName,
         'driverWarningMuted': _driverWarningMuted,
+        'autoBrightness': _autoBrightness,
+        'brightness': _brightness,
+        'simplifyColors': _simplifyColors,
+        'simplifyColorCount': _simplifyColorCount,
       };
 
   /// 把当前设置写出去（异步、失败只记日志，不影响使用）。
@@ -1607,9 +1727,31 @@ class AppState extends ChangeNotifier {
       _driverWarningMuted = driverWarningMuted;
     }
 
+    // ---- 处理阶段 ----
+    final Object? autoBrightness = data['autoBrightness'];
+    if (autoBrightness is bool) {
+      _autoBrightness = autoBrightness;
+    }
+    final Object? brightness = data['brightness'];
+    if (brightness is num) {
+      final double value = brightness.toDouble();
+      _brightness = value < -100 ? -100 : (value > 100 ? 100 : value);
+    }
+    final Object? simplifyColors = data['simplifyColors'];
+    if (simplifyColors is bool) {
+      _simplifyColors = simplifyColors;
+    }
+    final Object? simplifyColorCount = data['simplifyColorCount'];
+    if (simplifyColorCount is int) {
+      _simplifyColorCount = simplifyColorCount < 2
+          ? 2
+          : (simplifyColorCount > 64 ? 64 : simplifyColorCount);
+    }
+
     if (_disposed) {
       return;
     }
+    _invalidatePreview();
     addLog(LogLevel.info, '已恢复上次的设置');
     notifyListeners();
   }

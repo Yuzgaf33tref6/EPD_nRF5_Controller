@@ -7,6 +7,8 @@ import 'package:epd_controller/devices/epd_driver.dart';
 import 'package:epd_controller/image/canvas_editing.dart';
 import 'package:epd_controller/image/dither.dart';
 import 'package:epd_controller/image/epd_color.dart';
+import 'package:epd_controller/image/preview_computer.dart';
+import 'package:epd_controller/image/process.dart';
 import 'package:epd_controller/image/rgba_image.dart';
 import 'package:epd_controller/models/transfer_speed.dart';
 import 'package:epd_controller/protocol/debug_commands.dart';
@@ -749,6 +751,70 @@ void main() {
       await settle();
       expect(state.wakeupPin, 0xFF);
       expect(state.sleepSafety, SleepSafety.unsafe);
+    });
+  });
+
+  group('处理阶段', () {
+    test('默认只开自动亮度', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      expect(state.autoBrightness, isTrue);
+      expect(state.brightness, 0);
+      expect(state.simplifyColors, isFalse);
+      expect(state.simplifyColorCount, 8);
+      expect(state.processSummary, '自动亮度');
+    });
+
+    test('改处理参数会影响预览，并在恢复默认后回到原样', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      final List<int> before =
+          List<int>.of(state.previewImage.data, growable: false);
+
+      state.setBrightness(-40);
+      expect(state.brightness, -40);
+      final List<int> darkened =
+          List<int>.of(state.previewImage.data, growable: false);
+      expect(darkened, isNot(equals(before)));
+
+      state.resetProcess();
+      expect(state.brightness, 0);
+      expect(
+        List<int>.of(state.previewImage.data, growable: false),
+        equals(before),
+      );
+    });
+
+    test('参数会被夹到合法范围', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      state.setBrightness(-999);
+      expect(state.brightness, -100);
+      state.setBrightness(999);
+      expect(state.brightness, 100);
+      state.setSimplifyColorCount(1);
+      expect(state.simplifyColorCount, 2);
+      state.setSimplifyColorCount(999);
+      expect(state.simplifyColorCount, 64);
+    });
+
+    test('处理档预览与「处理」层一致、原图档等于源图', () {
+      final AppState state = buildState();
+      addTearDown(state.dispose);
+      state.setSimplifyColors(true);
+      state.setSimplifyColorCount(4);
+
+      final RgbaImage processed =
+          computeDitherJobSync(state.previewJob(PreviewStage.processed));
+      expect(processed.data, equals(state.processedImage.data));
+
+      final RgbaImage original =
+          computeDitherJobSync(state.previewJob(PreviewStage.original));
+      expect(original.data, equals(state.sourceImage.data));
+
+      final RgbaImage dithered =
+          computeDitherJobSync(state.previewJob(PreviewStage.dithered));
+      expect(dithered.data, isNot(equals(processed.data)));
     });
   });
 }
