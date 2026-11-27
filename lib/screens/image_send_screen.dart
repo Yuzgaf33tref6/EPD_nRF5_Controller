@@ -12,6 +12,39 @@ import '../widgets/image_preview.dart';
 import 'canvas_editor_screen.dart';
 import 'crop_screen.dart';
 
+/// 老上位机（web 版）自带的算法，和它的 `ditherAlg` 选项一一对应。
+const List<DitherAlgorithm> _classicAlgorithms = <DitherAlgorithm>[
+  DitherAlgorithm.floydSteinberg,
+  DitherAlgorithm.atkinson,
+  DitherAlgorithm.stucki,
+  DitherAlgorithm.jarvis,
+  DitherAlgorithm.bayer,
+  DitherAlgorithm.none,
+];
+
+/// 0.3.0 新增的算法：误差扩散补全 + 更细腻的有序抖动。
+const List<DitherAlgorithm> _modernAlgorithms = <DitherAlgorithm>[
+  DitherAlgorithm.sierraLite,
+  DitherAlgorithm.burkes,
+  DitherAlgorithm.shiauFan,
+  DitherAlgorithm.shiauFan2,
+  DitherAlgorithm.bayer4x4,
+  DitherAlgorithm.blueNoise,
+];
+
+/// 是否是误差扩散类算法（只有这类算法受「蛇形扫描」开关影响）。
+bool _isErrorDiffusion(DitherAlgorithm algorithm) {
+  switch (algorithm) {
+    case DitherAlgorithm.bayer:
+    case DitherAlgorithm.bayer4x4:
+    case DitherAlgorithm.blueNoise:
+    case DitherAlgorithm.none:
+      return false;
+    default:
+      return true;
+  }
+}
+
 /// 图像发送页（二级）：画布预览 + 处理 + 抖动参数 + 导入/编辑 + 发送。
 ///
 /// 流水线固定为 **原图 → 处理 → 抖动**：处理阶段调亮度/自动亮度/色彩简化，
@@ -281,23 +314,71 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      DropdownButton<DitherAlgorithm>(
-                        isExpanded: true,
-                        value: state.algorithm,
-                        onChanged: (DitherAlgorithm? value) {
-                          if (value != null) {
-                            state.setAlgorithm(value);
-                            _requestPreview();
-                          }
-                        },
-                        items: <DropdownMenuItem<DitherAlgorithm>>[
+                      Text(
+                        '老上位机自带的算法',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
                           for (final DitherAlgorithm algorithm
-                              in DitherAlgorithm.values)
-                            DropdownMenuItem<DitherAlgorithm>(
-                              value: algorithm,
-                              child: Text(_algorithmLabel(algorithm)),
-                            ),
+                              in _classicAlgorithms)
+                            _algorithmChip(state, algorithm),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '现代抖动（0.3.0 新增）',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          for (final DitherAlgorithm algorithm
+                              in _modernAlgorithms)
+                            _algorithmChip(state, algorithm),
+                        ],
+                      ),
+                      if (state.algorithm == DitherAlgorithm.blueNoise &&
+                          !state.noiseMaskReady) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          state.noiseMaskLoading
+                              ? '正在加载蓝噪声纹理 …'
+                              : '蓝噪声纹理尚未就绪：暂时会用程序生成的散列噪声代替。',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: state.serpentine,
+                        onChanged: _isErrorDiffusion(state.algorithm)
+                            ? (bool value) {
+                                state.setSerpentine(value);
+                                _requestPreview();
+                              }
+                            : null,
+                        title: const Text('蛇形扫描'),
+                        subtitle: Text(
+                          _isErrorDiffusion(state.algorithm)
+                              ? '奇数行反向扫描，能减少斜向纹路；对误差扩散类算法有效。'
+                              : '只有误差扩散类算法支持蛇形扫描。',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                       _SliderRow(
                         label: '强度',
@@ -483,13 +564,30 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     );
   }
 
+  Widget _algorithmChip(AppState state, DitherAlgorithm algorithm) {
+    return ChoiceChip(
+      label: Text(_algorithmLabel(algorithm)),
+      selected: state.algorithm == algorithm,
+      onSelected: (bool _) {
+        state.setAlgorithm(algorithm);
+        _requestPreview();
+      },
+    );
+  }
+
   String _algorithmLabel(DitherAlgorithm algorithm) {
     return switch (algorithm) {
       DitherAlgorithm.floydSteinberg => 'Floyd–Steinberg（默认）',
       DitherAlgorithm.atkinson => 'Atkinson',
       DitherAlgorithm.stucki => 'Stucki',
       DitherAlgorithm.jarvis => 'Jarvis',
-      DitherAlgorithm.bayer => 'Bayer',
+      DitherAlgorithm.bayer => 'Bayer 8×8',
+      DitherAlgorithm.sierraLite => 'Sierra Lite',
+      DitherAlgorithm.burkes => 'Burkes',
+      DitherAlgorithm.shiauFan => 'Shiau-Fan',
+      DitherAlgorithm.shiauFan2 => 'Shiau-Fan 2',
+      DitherAlgorithm.bayer4x4 => 'Bayer 4×4',
+      DitherAlgorithm.blueNoise => '蓝噪声',
       DitherAlgorithm.none => '不抖动',
     };
   }

@@ -30,6 +30,9 @@ DitherJob buildJob({
   EpdColorMode mode = EpdColorMode.threeColor,
   ProcessSettings process = ProcessSettings.defaults,
   PreviewStage stage = PreviewStage.dithered,
+  bool serpentine = false,
+  Uint8List? noiseMask,
+  int noiseMaskEdge = 64,
 }) {
   final RgbaImage image = buildImage(24, 16);
   return DitherJob(
@@ -42,6 +45,9 @@ DitherJob buildJob({
     mode: mode,
     process: process,
     stage: stage,
+    serpentine: serpentine,
+    noiseMask: noiseMask,
+    noiseMaskEdge: noiseMaskEdge,
   );
 }
 
@@ -75,6 +81,22 @@ void main() {
       expect(
         buildJob().key,
         isNot(equals(buildJob(mode: EpdColorMode.sixColor).key)),
+      );
+    });
+
+    test('蛇形扫描与蓝噪声掩膜也参与 key', () {
+      expect(
+        buildJob().key,
+        isNot(equals(buildJob(serpentine: true).key)),
+      );
+      final Uint8List mask = Uint8List.fromList(<int>[1, 2, 3, 4]);
+      expect(
+        buildJob(algorithm: DitherAlgorithm.blueNoise).key,
+        isNot(equals(buildJob(
+          algorithm: DitherAlgorithm.blueNoise,
+          noiseMask: mask,
+          noiseMaskEdge: 2,
+        ).key)),
       );
     });
 

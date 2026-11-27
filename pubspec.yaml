@@ -44,3 +44,6 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  assets:
+    # 蓝噪声抖动用的 64×64 阈值纹理（来源与许可见 assets/NOTICE.md）。
+    - assets/blue_noise_64.png

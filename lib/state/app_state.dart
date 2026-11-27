@@ -23,6 +23,7 @@ import '../image/canvas_editing.dart';
 import '../image/crop_geometry.dart';
 import '../image/dither.dart';
 import '../image/epd_color.dart';
+import '../image/noise_mask.dart' as noise;
 import '../image/preview_computer.dart';
 import '../image/process.dart';
 import '../image/rgba_image.dart';
@@ -217,6 +218,13 @@ class AppState extends ChangeNotifier {
   DitherAlgorithm _algorithm = DitherAlgorithm.floydSteinberg;
   double _strength = 1.0;
   double _contrast = 1.2;
+
+  /// 误差扩散是否走蛇形扫描（奇数行反向），能打散斜向纹路。
+  bool _serpentine = false;
+
+  /// 蓝噪声阈值表（64×64）。由 `loadNoiseMask()` 从 assets 解码后缓存。
+  Uint8List? _noiseMask;
+  bool _noiseMaskLoading = false;
 
   // ---- 处理阶段（原图 → 处理 → 抖动）----
   bool _autoBrightness = true;
@@ -438,14 +446,22 @@ class AppState extends ChangeNotifier {
   /// 只有「发送」这种本来就该等的地方才调这里。
   RgbaImage get previewImage {
     final Object key = Object.hash(_sourceImage, _algorithm, _strength,
-        _contrast, colorMode, process.key, _sourceImage.width, _sourceImage.height);
+        _contrast, colorMode, process.key, _sourceImage.width, _sourceImage.height,
+        _serpentine, identityHashCode(_noiseMask));
     final RgbaImage? cached = _previewCache;
     if (cached != null && _previewCacheKey == key) {
       return cached;
     }
     RgbaImage image = processImage(_sourceImage, process);
     image = adjustContrast(image, _contrast);
-    image = ditherImage(image, _algorithm, _strength, colorMode);
+    image = ditherImage(
+      image,
+      _algorithm,
+      _strength,
+      colorMode,
+      serpentine: _serpentine,
+      noiseMask: _noiseMask,
+    );
     _previewCache = image;
     _previewCacheKey = key;
     return image;
@@ -464,6 +480,8 @@ class AppState extends ChangeNotifier {
         mode: colorMode,
         process: process,
         stage: stage,
+        serpentine: _serpentine,
+        noiseMask: _noiseMask,
       );
 
   /// 抖动阶段的完整参数（默认按「抖动」档算）。
@@ -1346,6 +1364,10 @@ class AppState extends ChangeNotifier {
       return;
     }
     _algorithm = algorithm;
+    if (algorithm == DitherAlgorithm.blueNoise) {
+      // 蓝噪声需要那 4 KB 阈值表；第一次选中时在后台加载，不阻塞界面。
+      unawaited(loadNoiseMask());
+    }
     notifyListeners();
   }
 
@@ -1362,6 +1384,55 @@ class AppState extends ChangeNotifier {
       return;
     }
     _contrast = value;
+    notifyListeners();
+  }
+
+  // ---- 0.3.0：现代抖动的附加参数 ----
+
+  /// 误差扩散是否走蛇形扫描。
+  bool get serpentine => _serpentine;
+
+  /// 蓝噪声阈值表是否已就绪（没就绪时选 blueNoise 会退回散列噪声）。
+  bool get noiseMaskReady => _noiseMask != null;
+
+  /// 蓝噪声阈值表是否正在加载。
+  bool get noiseMaskLoading => _noiseMaskLoading;
+
+  void setSerpentine(bool value) {
+    if (value == _serpentine) {
+      return;
+    }
+    _serpentine = value;
+    _persistSettings();
+    addLog(
+      LogLevel.info,
+      value ? '抖动改为蛇形扫描（奇数行反向）' : '抖动改回逐行扫描',
+    );
+    notifyListeners();
+  }
+
+  /// 加载内置的 64×64 蓝噪声纹理。重复调用是安全的（已有就跳过）。
+  Future<void> loadNoiseMask() async {
+    if (_noiseMask != null || _noiseMaskLoading) {
+      return;
+    }
+    _noiseMaskLoading = true;
+    notifyListeners();
+    final Uint8List? mask = await noise.loadNoiseMask();
+    _noiseMaskLoading = false;
+    if (_disposed) {
+      return;
+    }
+    if (mask == null) {
+      addLog(
+        LogLevel.warning,
+        '蓝噪声纹理加载失败，将退回程序生成的散列噪声；画面会略差一些。',
+      );
+    } else {
+      _noiseMask = mask;
+      addLog(LogLevel.info, '蓝噪声纹理已就绪（${mask.length} 个阈值）');
+    }
+    _invalidatePreview();
     notifyListeners();
   }
 
@@ -1627,6 +1698,7 @@ class AppState extends ChangeNotifier {
         'brightness': _brightness,
         'simplifyColors': _simplifyColors,
         'simplifyColorCount': _simplifyColorCount,
+        'serpentine': _serpentine,
       };
 
   /// 把当前设置写出去（异步、失败只记日志，不影响使用）。
@@ -1746,6 +1818,16 @@ class AppState extends ChangeNotifier {
       _simplifyColorCount = simplifyColorCount < 2
           ? 2
           : (simplifyColorCount > 64 ? 64 : simplifyColorCount);
+    }
+
+    // ---- 现代抖动 ----
+    final Object? serpentine = data['serpentine'];
+    if (serpentine is bool) {
+      _serpentine = serpentine;
+    }
+    // 蓝噪声掩膜不持久化（4 KB 字节数组没必要进 JSON），启动后按需加载。
+    if (_algorithm == DitherAlgorithm.blueNoise) {
+      unawaited(loadNoiseMask());
     }
 
     if (_disposed) {

@@ -491,6 +491,7 @@ void main() {
       state.setVerboseTransfers(false);
       state.setThemeMode(ThemeMode.dark);
       state.setInterleavedCount(33);
+      state.setSerpentine(true);
       await settle();
 
       expect(store.saveCount, greaterThan(0));
@@ -500,6 +501,7 @@ void main() {
       expect(saved['verboseTransfers'], false);
       expect(saved['themeMode'], 'dark');
       expect(saved['interleavedCount'], 33);
+      expect(saved['serpentine'], true);
       expect(saved['version'], AppState.kSettingsVersion);
     });
 
@@ -514,6 +516,7 @@ void main() {
         'interleavedOverride': true,
         'rleSupported': false,
         'verboseTransfers': false,
+        'serpentine': true,
       });
       final AppState state = AppState(
         bleService: buildFake(),
@@ -532,6 +535,7 @@ void main() {
       expect(state.interleavedCount, 33);
       expect(state.interleavedCountOverridden, isTrue);
       expect(state.verboseTransfers, isFalse);
+      expect(state.serpentine, isTrue);
       // 恢复了驱动，示例图应当按新画布尺寸重生成
       expect(state.sourceImage.width, 800);
     });

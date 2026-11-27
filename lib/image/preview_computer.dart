@@ -28,6 +28,9 @@ class DitherJob {
     required this.mode,
     this.process = ProcessSettings.defaults,
     this.stage = PreviewStage.dithered,
+    this.serpentine = false,
+    this.noiseMask,
+    this.noiseMaskEdge = kBlueNoiseEdge,
   });
 
   final int width;
@@ -44,6 +47,17 @@ class DitherJob {
   /// 算到哪一步停。
   final PreviewStage stage;
 
+  /// 误差扩散是否走蛇形扫描（奇数行反向）。
+  final bool serpentine;
+
+  /// 蓝噪声阈值表（只在 [DitherAlgorithm.blueNoise] 时用）。
+  ///
+  /// 必须随 job 一起传进 isolate —— 后台 isolate 里读不了 `rootBundle`。
+  final Uint8List? noiseMask;
+
+  /// [noiseMask] 的边长。
+  final int noiseMaskEdge;
+
   /// 标识这份入参的键，用来判断结果是否还有效。
   Object get key => Object.hash(
         width,
@@ -54,6 +68,9 @@ class DitherJob {
         mode,
         process.key,
         stage,
+        serpentine,
+        noiseMask == null ? 0 : _hashBytes(noiseMask!),
+        noiseMaskEdge,
         _hashBytes(rgba),
       );
 
@@ -67,6 +84,9 @@ class DitherJob {
         mode: mode,
         process: process,
         stage: stage ?? this.stage,
+        serpentine: serpentine,
+        noiseMask: noiseMask,
+        noiseMaskEdge: noiseMaskEdge,
       );
 }
 
@@ -166,7 +186,15 @@ RgbaImage _runDitherJob(DitherJob job) {
     return out;
   }
   out = adjustContrast(out, job.contrast);
-  out = ditherImage(out, job.algorithm, job.strength, job.mode);
+  out = ditherImage(
+    out,
+    job.algorithm,
+    job.strength,
+    job.mode,
+    serpentine: job.serpentine,
+    noiseMask: job.noiseMask,
+    noiseMaskEdge: job.noiseMaskEdge,
+  );
   return out;
 }
 
