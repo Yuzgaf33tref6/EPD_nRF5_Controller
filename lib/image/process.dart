@@ -308,7 +308,6 @@ RgbaImage applyBrightnessBalance(
   double highPercentile = 0.99,
   double targetMedian = 0.5,
 }) {
-  final Uint8List data = image.data;
   final int pixels = image.width * image.height;
   if (pixels == 0) {
     return image.clone();
