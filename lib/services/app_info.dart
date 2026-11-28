@@ -14,7 +14,7 @@ class AppVersion {
   static const String version = '0.3.0';
 
   /// 构建号，与 `pubspec.yaml` 里 `version: x.y.z+N` 的 N 一致。
-  static const int buildNumber = 5;
+  static const int buildNumber = 6;
 
   /// 完整版本串，例如 `0.2.0+2`。
   static String get fullVersion => '$version+$buildNumber';

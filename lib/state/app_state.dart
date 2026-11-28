@@ -235,6 +235,12 @@ class AppState extends ChangeNotifier {
 
   RgbaImage? _previewCache;
   Object? _previewCacheKey;
+
+  /// 最近一次真正算出来（或从后台 isolate 接收）的抖动图。
+  ///
+  /// 它**不随参数变化失效**，专门给统计行/传图计划兜底：参数刚改的那一瞬间
+  /// 宁可显示上一版的数字，也不能在 UI 线程上重算一遍（色彩简化要几秒）。
+  RgbaImage? _lastGoodPreview;
   RgbaImage? _processedCache;
   Object? _processedCacheKey;
   ImageTransferPlan? _planCache;
@@ -456,6 +462,7 @@ class AppState extends ChangeNotifier {
     }
     _previewCache = image;
     _previewCacheKey = _previewImageKey();
+    _lastGoodPreview = image;
   }
 
   Object _previewImageKey() => Object.hash(_sourceImage, _algorithm, _strength,
@@ -470,6 +477,12 @@ class AppState extends ChangeNotifier {
     final RgbaImage? cached = _previewCache;
     if (cached != null) {
       return cached;
+    }
+    final RgbaImage? lastGood = _lastGoodPreview;
+    if (lastGood != null &&
+        lastGood.width == _sourceImage.width &&
+        lastGood.height == _sourceImage.height) {
+      return lastGood;
     }
     return previewImage;
   }
@@ -497,6 +510,7 @@ class AppState extends ChangeNotifier {
     );
     _previewCache = image;
     _previewCacheKey = key;
+    _lastGoodPreview = image;
     return image;
   }
 
@@ -1691,6 +1705,9 @@ class AppState extends ChangeNotifier {
     _processedCacheKey = null;
     _planCache = null;
     _planCacheKey = null;
+    // 注意：**不清** _lastGoodPreview。参数刚变、后台还没算完的那一小段时间里，
+    // 统计行要继续拿上一版结果顶着；清掉它就会退回同步重算（色彩简化要几秒），
+    // 主线程一堵，「处理中」遮罩又弹不出来。
   }
 
   // ============ 画布编辑 ============
