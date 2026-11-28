@@ -13,7 +13,7 @@ import 'rgba_image.dart';
 /// 传递，实体类虽然多数情况下可以，但这里显式把 RGBA 字节拆出来传，行为更可预期，
 /// 也方便单测（无 Flutter 环境也能算）。
 ///
-/// 流水线：**原图 → 处理（自动亮度 / 亮度 / 色彩简化）→ 抖动**。
+/// 流水线：**原图 → 处理（预处理 / 亮度均衡 / 亮度 / 色彩简化）→ 抖动**。
 /// [stage] 决定算到哪一步停：`original` 直接返回原图，`processed` 停在做完处理，
 /// `dithered` 再往下跑对比度与抖动。
 @immutable
@@ -31,6 +31,7 @@ class DitherJob {
     this.serpentine = false,
     this.noiseMask,
     this.noiseMaskEdge = kBlueNoiseEdge,
+    this.alreadyProcessed = false,
   });
 
   final int width;
@@ -58,6 +59,12 @@ class DitherJob {
   /// [noiseMask] 的边长。
   final int noiseMaskEdge;
 
+  /// [rgba] 是否**已经**是处理完的数据（只改抖动参数时复用处理结果用）。
+  ///
+  /// 为真时跳过 [processImage]，直接用 [rgba] 当抖动输入。这样「只动了抖动设置」
+  /// 就不会再把色彩简化 / 亮度均衡重算一遍 —— 那正是用户反馈的那几秒卡顿。
+  final bool alreadyProcessed;
+
   /// 标识这份入参的键，用来判断结果是否还有效。
   Object get key => Object.hash(
         width,
@@ -71,13 +78,19 @@ class DitherJob {
         serpentine,
         noiseMask == null ? 0 : _hashBytes(noiseMask!),
         noiseMaskEdge,
+        alreadyProcessed,
         _hashBytes(rgba),
       );
 
-  DitherJob copyWith({PreviewStage? stage}) => DitherJob(
+  DitherJob copyWith({
+    PreviewStage? stage,
+    Uint8List? rgba,
+    bool? alreadyProcessed,
+  }) =>
+      DitherJob(
         width: width,
         height: height,
-        rgba: rgba,
+        rgba: rgba ?? this.rgba,
         algorithm: algorithm,
         strength: strength,
         contrast: contrast,
@@ -87,6 +100,7 @@ class DitherJob {
         serpentine: serpentine,
         noiseMask: noiseMask,
         noiseMaskEdge: noiseMaskEdge,
+        alreadyProcessed: alreadyProcessed ?? this.alreadyProcessed,
       );
 }
 
@@ -108,12 +122,19 @@ int _hashBytes(Uint8List bytes) {
 /// 这是「一进预览页就卡」的正面解法：处理 + 对比度 + 抖动要遍历 12 万像素、
 /// 每个像素还要跟调色板做一次 Lab 距离比较，跑在主 isolate 上必然掉帧。
 /// 放到后台后，UI 线程只负责画已经转好的贴图，滑块拖动期间界面依然跟手。
+///
+/// 另外它还负责**缓存处理结果**：处理参数没变、只改了抖动参数时，
+/// 直接把上次的处理结果当输入丢进 isolate，跳过预处理 / 亮度均衡 / 色彩简化。
 class PreviewComputer {
   PreviewComputer();
 
   /// 上一次的结果与它的键，用于避免重复计算。
   RgbaImage? _lastResult;
   Object? _lastKey;
+
+  /// 处理阶段的结果缓存（与 [DitherJob.process] + 原图绑定）。
+  RgbaImage? _processedBase;
+  Object? _processedBaseKey;
 
   /// 已经排队但还没开始的请求只保留最后一个（拖动滑块时中间的都不需要）。
   DitherJob? _queued;
@@ -125,6 +146,26 @@ class PreviewComputer {
   /// 带上 [DitherJob] 是为了让界面能判断结果是否还对应现在选中的档位：
   /// 算的过程中用户可能已经切到别的档了，那种结果要丢掉。
   void Function(DitherJob job, RgbaImage image)? onResult;
+
+  /// 处理结果的缓存键：原图（按对象身份，换了图自然失效）+ 处理参数。
+  Object _processedKeyOf(DitherJob job) =>
+      Object.hash(identityHashCode(job.rgba), job.rgba.length, job.process.key);
+
+  /// 拿到「处理完」的图：命中缓存就直接返回，否则去后台算一次并缓存。
+  Future<RgbaImage> _ensureProcessed(DitherJob job) async {
+    final Object key = _processedKeyOf(job);
+    final RgbaImage? cached = _processedBase;
+    if (cached != null && _processedBaseKey == key) {
+      return cached;
+    }
+    final RgbaImage fresh = await compute(
+      _runDitherJob,
+      job.copyWith(stage: PreviewStage.processed, alreadyProcessed: false),
+    );
+    _processedBase = fresh;
+    _processedBaseKey = key;
+    return fresh;
+  }
 
   /// 提交一次计算请求。相同的入参会被跳过；正在算时新请求会覆盖掉排队的那个。
   void request(DitherJob job) {
@@ -147,7 +188,7 @@ class PreviewComputer {
       while (_queued != null && !_disposed) {
         final DitherJob job = _queued!;
         _queued = null;
-        final RgbaImage result = await compute(_runDitherJob, job);
+        final RgbaImage result = await _run(job);
         if (_disposed) {
           return;
         }
@@ -160,11 +201,29 @@ class PreviewComputer {
     }
   }
 
+  Future<RgbaImage> _run(DitherJob job) async {
+    if (job.stage == PreviewStage.original) {
+      return compute(_runDitherJob, job);
+    }
+    if (job.stage == PreviewStage.processed) {
+      return _ensureProcessed(job);
+    }
+    // 抖动档：先确保处理结果可用，再只跑「对比度 + 抖动」。
+    final RgbaImage processed = await _ensureProcessed(job);
+    final DitherJob ditherJob = job.copyWith(
+      rgba: processed.data,
+      alreadyProcessed: true,
+    );
+    return compute(_runDitherJob, ditherJob);
+  }
+
   void dispose() {
     _disposed = true;
     _queued = null;
     _lastResult = null;
     _lastKey = null;
+    _processedBase = null;
+    _processedBaseKey = null;
     onResult = null;
   }
 }
@@ -181,7 +240,7 @@ RgbaImage _runDitherJob(DitherJob job) {
   if (job.stage == PreviewStage.original) {
     return base;
   }
-  RgbaImage out = processImage(base, job.process);
+  RgbaImage out = job.alreadyProcessed ? base : processImage(base, job.process);
   if (job.stage == PreviewStage.processed) {
     return out;
   }

@@ -220,5 +220,33 @@ void main() {
       expect(processed.data, isNot(equals(dithered.data)));
       expect(original.data, isNot(equals(dithered.data)));
     });
+
+    test('alreadyProcessed 时跳过处理，结果与完整流水线一致', () {
+      const ProcessSettings process = ProcessSettings(brightness: 24);
+      final DitherJob full = buildJob(process: process);
+      final RgbaImage expected = computeDitherJobSync(full);
+
+      // 模拟「只改了抖动参数」：拿上次的处理结果直接当输入。
+      final RgbaImage processed = computeDitherJobSync(
+        buildJob(stage: PreviewStage.processed, process: process),
+      );
+      final DitherJob reused = DitherJob(
+        width: full.width,
+        height: full.height,
+        rgba: Uint8List.fromList(processed.data),
+        algorithm: full.algorithm,
+        strength: full.strength,
+        contrast: full.contrast,
+        mode: full.mode,
+        process: process,
+        alreadyProcessed: true,
+      );
+      expect(computeDitherJobSync(reused).data, equals(expected.data));
+    });
+
+    test('alreadyProcessed 也参与 key（避免误命中缓存）', () {
+      final DitherJob job = buildJob(process: const ProcessSettings(brightness: 8));
+      expect(job.key, isNot(equals(job.copyWith(alreadyProcessed: true).key)));
+    });
   });
 }

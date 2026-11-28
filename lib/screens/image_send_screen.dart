@@ -39,13 +39,15 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   bool _showBusy = false;
   bool _disposed = false;
 
-  // ---- 滑块拖动中的临时值（让滑块跟手，不每次拖动都整图重算）----
+  // ---- 滑块拖动中的临时值（让滑块跟手，松手之前绝不重算）----
   double? _pendingStrength;
   double? _pendingContrast;
   double? _pendingBrightness;
-  Timer? _strengthDebounce;
-  Timer? _contrastDebounce;
-  Timer? _brightnessDebounce;
+  int? _pendingColorCount;
+
+  // ---- 自动亮度按钮的「已选中」态 ----
+  bool _autoBrightnessApplied = false;
+  double? _brightnessBeforeAuto;
 
   /// 弹「处理中」遮罩的阈值：低于这个时长用户感知不到，没必要闪一下。
   static const Duration _busyThreshold = Duration(milliseconds: 300);
@@ -60,9 +62,6 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   void dispose() {
     _disposed = true;
     _busyTimer?.cancel();
-    _strengthDebounce?.cancel();
-    _contrastDebounce?.cancel();
-    _brightnessDebounce?.cancel();
     _preview.dispose();
     super.dispose();
   }
@@ -166,6 +165,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                       children: <Widget>[
+                        _buildCanvasCard(state, theme),
+                        const SizedBox(height: 12),
                         _buildProcessCard(state, theme),
                         const SizedBox(height: 12),
                         _buildDitherCard(state, theme),
@@ -254,6 +255,68 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     );
   }
 
+  /// 画布来源与方向：导入 / 旋转 / 重置示例图。
+  ///
+  /// 这三件事作用的是「画布内容」而不是「抖动」，所以单独一张卡放在预览下面。
+  Widget _buildCanvasCard(AppState state, ThemeData theme) {
+    return SectionCard(
+      title: '画布',
+      icon: Icons.photo_library_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () => _importImage(state),
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: const Text('导入图片'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  state.rotateSource();
+                  _requestPreview();
+                },
+                icon: const Icon(Icons.rotate_90_degrees_cw, size: 18),
+                label: const Text('旋转画布'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  state.resetSource();
+                  _requestPreview();
+                },
+                icon: const Icon(Icons.restart_alt, size: 18),
+                label: const Text('重置示例图'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const CanvasEditorScreen(),
+                    ),
+                  );
+                  _requestPreview();
+                },
+                icon: const Icon(Icons.brush_outlined, size: 18),
+                label: const Text('画布编辑'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '当前画布 ${state.canvasSize.width}×${state.canvasSize.height} · '
+            '${state.colorMode.jsName}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProcessCard(AppState state, ThemeData theme) {
     return CollapsibleCard(
       title: '处理',
@@ -309,35 +372,35 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
             max: 100,
             divisions: 200,
             display: formatBrightness(_pendingBrightness ?? state.brightness),
+            // 拖动过程只更新界面，绝不触发计算 —— 松手（onChangeEnd）才真算。
             onChanged: (double value) {
               setState(() => _pendingBrightness = value);
-              _brightnessDebounce?.cancel();
-              _brightnessDebounce = Timer(
-                const Duration(milliseconds: 160),
-                () => _commitBrightness(value),
-              );
             },
             onChangeEnd: _commitBrightness,
+            onEdit: () => _showNumberInput(
+              title: '亮度',
+              initial: state.brightness.round(),
+              min: -100,
+              max: 100,
+              suffix: '（-100 ~ 100）',
+              onSubmitted: (int value) {
+                _commitBrightness(value.toDouble());
+              },
+            ),
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () {
-                final double value = state.applyAutoBrightness();
-                setState(() => _pendingBrightness = null);
-                _requestPreview();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '自动亮度：亮度 ${formatBrightness(value)}',
-                    ),
-                    duration: const Duration(seconds: 2),
+            child: _autoBrightnessApplied
+                ? FilledButton.tonalIcon(
+                    onPressed: () => _toggleAutoBrightness(state),
+                    icon: const Icon(Icons.auto_fix_high, size: 18),
+                    label: const Text('自动亮度（已应用）'),
+                  )
+                : TextButton.icon(
+                    onPressed: () => _toggleAutoBrightness(state),
+                    icon: const Icon(Icons.auto_fix_high, size: 18),
+                    label: const Text('自动亮度'),
                   ),
-                );
-              },
-              icon: const Icon(Icons.auto_fix_high, size: 18),
-              label: const Text('自动亮度'),
-            ),
           ),
           SwitchListTile(
             dense: true,
@@ -355,15 +418,24 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
           if (state.simplifyColors)
             _SliderRow(
               label: '色数',
-              value: state.simplifyColorCount.toDouble(),
+              value: (_pendingColorCount ?? state.simplifyColorCount)
+                  .toDouble(),
               min: 2,
               max: 64,
               divisions: 62,
-              display: '${state.simplifyColorCount}',
+              display: '${_pendingColorCount ?? state.simplifyColorCount}',
               onChanged: (double value) {
-                state.setSimplifyColorCount(value.round());
-                _requestPreview();
+                setState(() => _pendingColorCount = value.round());
               },
+              onChangeEnd: (double value) => _commitColorCount(value.round()),
+              onEdit: () => _showNumberInput(
+                title: '色数',
+                initial: state.simplifyColorCount,
+                min: 2,
+                max: 64,
+                suffix: '（2 ~ 64 色）',
+                onSubmitted: _commitColorCount,
+              ),
             ),
           Align(
             alignment: Alignment.centerLeft,
@@ -372,6 +444,9 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
                 state.resetProcess();
                 setState(() {
                   _pendingBrightness = null;
+                  _pendingColorCount = null;
+                  _autoBrightnessApplied = false;
+                  _brightnessBeforeAuto = null;
                 });
                 _requestPreview();
               },
@@ -484,11 +559,6 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
             display: (_pendingStrength ?? state.strength).toStringAsFixed(1),
             onChanged: (double value) {
               setState(() => _pendingStrength = value);
-              _strengthDebounce?.cancel();
-              _strengthDebounce = Timer(
-                const Duration(milliseconds: 160),
-                () => _commitStrength(value),
-              );
             },
             onChangeEnd: _commitStrength,
           ),
@@ -501,41 +571,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
             display: (_pendingContrast ?? state.contrast).toStringAsFixed(1),
             onChanged: (double value) {
               setState(() => _pendingContrast = value);
-              _contrastDebounce?.cancel();
-              _contrastDebounce = Timer(
-                const Duration(milliseconds: 160),
-                () => _commitContrast(value),
-              );
             },
             onChangeEnd: _commitContrast,
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              OutlinedButton.icon(
-                onPressed: () => _importImage(state),
-                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                label: const Text('导入图片'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  state.rotateSource();
-                  _requestPreview();
-                },
-                icon: const Icon(Icons.rotate_90_degrees_cw, size: 18),
-                label: const Text('旋转画布'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  state.resetSource();
-                  _requestPreview();
-                },
-                icon: const Icon(Icons.restart_alt, size: 18),
-                label: const Text('重置示例图'),
-              ),
-            ],
           ),
         ],
       ),
@@ -630,7 +667,6 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   }
 
   void _commitStrength(double value) {
-    _strengthDebounce?.cancel();
     final AppState state = AppStateScope.of(context);
     state.setStrength(value);
     if (mounted) {
@@ -640,7 +676,6 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   }
 
   void _commitContrast(double value) {
-    _contrastDebounce?.cancel();
     final AppState state = AppStateScope.of(context);
     state.setContrast(value);
     if (mounted) {
@@ -650,13 +685,82 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   }
 
   void _commitBrightness(double value) {
-    _brightnessDebounce?.cancel();
     final AppState state = AppStateScope.of(context);
     state.setBrightness(value);
     if (mounted) {
-      setState(() => _pendingBrightness = null);
+      setState(() {
+        _pendingBrightness = null;
+        // 手动拖过亮度之后，原来的「自动亮度」就不再是当前状态了。
+        _autoBrightnessApplied = false;
+        _brightnessBeforeAuto = null;
+      });
     }
     _requestPreview();
+  }
+
+  void _commitColorCount(int value) {
+    final AppState state = AppStateScope.of(context);
+    state.setSimplifyColorCount(value);
+    if (mounted) {
+      setState(() => _pendingColorCount = null);
+    }
+    _requestPreview();
+  }
+
+  /// 自动亮度：点一下按当前图算等效亮度并写进滑块；再点一下还原到点之前的值。
+  void _toggleAutoBrightness(AppState state) {
+    if (_autoBrightnessApplied) {
+      final double? restore = _brightnessBeforeAuto;
+      setState(() {
+        _autoBrightnessApplied = false;
+        _brightnessBeforeAuto = null;
+        _pendingBrightness = null;
+      });
+      if (restore != null) {
+        state.setBrightness(restore);
+      }
+      _requestPreview();
+      return;
+    }
+
+    final double previous = state.brightness;
+    final double value = state.applyAutoBrightness();
+    setState(() {
+      _autoBrightnessApplied = true;
+      _brightnessBeforeAuto = previous;
+      _pendingBrightness = null;
+    });
+    _requestPreview();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('自动亮度：亮度 ${formatBrightness(value)}（再点一次可还原）'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// 弹一个「输入数字」的对话框：滑块拖不准的时候直接敲值。
+  Future<void> _showNumberInput({
+    required String title,
+    required int initial,
+    required int min,
+    required int max,
+    required ValueChanged<int> onSubmitted,
+    String? suffix,
+  }) async {
+    final int? value = await showDialog<int>(
+      context: context,
+      builder: (BuildContext dialogContext) => _NumberInputDialog(
+        title: title,
+        initial: initial,
+        min: min,
+        max: max,
+        suffix: suffix,
+      ),
+    );
+    if (value != null) {
+      onSubmitted(value);
+    }
   }
 
   Future<void> _importImage(AppState state) async {
@@ -777,7 +881,78 @@ class _AlgorithmOption {
   final DitherAlgorithm? algorithm;
 }
 
+/// 输入一个整数的对话框。
+///
+/// controller 由对话框自己持有并在 `dispose()` 里释放 —— 反过来（在外面
+/// `await showDialog` 之后立刻 dispose）会在退场动画期间用到已释放的 controller。
+class _NumberInputDialog extends StatefulWidget {
+  const _NumberInputDialog({
+    required this.title,
+    required this.initial,
+    required this.min,
+    required this.max,
+    this.suffix,
+  });
+
+  final String title;
+  final int initial;
+  final int min;
+  final int max;
+  final String? suffix;
+
+  @override
+  State<_NumberInputDialog> createState() => _NumberInputDialogState();
+}
+
+class _NumberInputDialogState extends State<_NumberInputDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: '${widget.initial}',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final int? parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Navigator.of(context).pop(parsed.clamp(widget.min, widget.max));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('输入${widget.title}'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(signed: true),
+        decoration: InputDecoration(
+          labelText: widget.title,
+          helperText: widget.suffix,
+          border: const OutlineInputBorder(),
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
+      ],
+    );
+  }
+}
+
 /// 一行「标签 + 滑块 + 数值」。
+///
+/// [onEdit] 不为空时右侧数值可点，点开直接输入数字 —— 滑块拖不准时很有用。
 class _SliderRow extends StatelessWidget {
   const _SliderRow({
     required this.label,
@@ -787,6 +962,7 @@ class _SliderRow extends StatelessWidget {
     required this.display,
     required this.onChanged,
     this.onChangeEnd,
+    this.onEdit,
     this.divisions,
   });
 
@@ -798,10 +974,19 @@ class _SliderRow extends StatelessWidget {
   final int? divisions;
   final ValueChanged<double> onChanged;
   final ValueChanged<double>? onChangeEnd;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final Widget displayText = Text(
+      display,
+      textAlign: TextAlign.end,
+      style: theme.textTheme.bodySmall?.copyWith(
+        decoration: onEdit == null ? null : TextDecoration.underline,
+        color: onEdit == null ? null : theme.colorScheme.primary,
+      ),
+    );
     return Row(
       children: <Widget>[
         SizedBox(
@@ -819,12 +1004,17 @@ class _SliderRow extends StatelessWidget {
           ),
         ),
         SizedBox(
-          width: 44,
-          child: Text(
-            display,
-            textAlign: TextAlign.end,
-            style: theme.textTheme.bodySmall,
-          ),
+          width: 52,
+          child: onEdit == null
+              ? displayText
+              : InkWell(
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: displayText,
+                  ),
+                ),
         ),
       ],
     );
