@@ -36,7 +36,9 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   Object? _resultKey;
   Object? _requestedKey;
   Timer? _busyTimer;
+  Timer? _busyHideTimer;
   bool _showBusy = false;
+  DateTime? _busyShownAt;
   bool _disposed = false;
 
   // ---- 滑块拖动中的临时值（让滑块跟手，松手之前绝不重算）----
@@ -50,7 +52,14 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   double? _brightnessBeforeAuto;
 
   /// 弹「处理中」遮罩的阈值：低于这个时长用户感知不到，没必要闪一下。
-  static const Duration _busyThreshold = Duration(milliseconds: 300);
+  ///
+  /// 用户实测「点色彩简化到弹出遮罩用了约 4 秒」，那不是遮罩慢，而是主线程
+  /// 被同步重算堵死了（`transferPlan` 曾经直接调 `previewImage`）。现在统计行
+  /// 用上一次的结果顶住，主线程不再阻塞，阈值降到 150ms 就够。
+  static const Duration _busyThreshold = Duration(milliseconds: 150);
+
+  /// 遮罩最短显示时长：算得快的场景也让它露个脸，避免一闪而过。
+  static const Duration _busyMinVisible = Duration(milliseconds: 400);
 
   @override
   void initState() {
@@ -62,6 +71,7 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
   void dispose() {
     _disposed = true;
     _busyTimer?.cancel();
+    _busyHideTimer?.cancel();
     _preview.dispose();
     super.dispose();
   }
@@ -70,13 +80,47 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
     if (!mounted || _disposed || job.stage != _stage) {
       return;
     }
+    // 把后台算好的抖动结果交给 AppState，统计行/发送才不用在 UI 线程重算。
+    // 只有「结果对应的参数就是当前参数」才接收：否则用户刚又改了参数，
+    // 收下一张旧图会让统计行甚至「发送」用到过期数据。
+    final AppState? state = AppStateScope.maybeOf(context);
+    if (job.stage == PreviewStage.dithered &&
+        state != null &&
+        state.previewJob(PreviewStage.dithered).key == job.key) {
+      state.adoptDitheredResult(image);
+    }
+    _busyTimer?.cancel();
     setState(() {
       _previewResult = image;
       _resultStage = job.stage;
       _resultKey = job.key;
-      _showBusy = false;
     });
-    _busyTimer?.cancel();
+    _scheduleHideBusy();
+  }
+
+  /// 收起遮罩；若弹出还不足 [_busyMinVisible]，先把剩余时间等完再收。
+  void _scheduleHideBusy() {
+    _busyHideTimer?.cancel();
+    if (!_showBusy) {
+      return;
+    }
+    final DateTime? shownAt = _busyShownAt;
+    final Duration shown = shownAt == null
+        ? _busyMinVisible
+        : DateTime.now().difference(shownAt);
+    final Duration remaining = _busyMinVisible - shown;
+    if (remaining <= Duration.zero) {
+      setState(() => _showBusy = false);
+      _busyShownAt = null;
+      return;
+    }
+    _busyHideTimer = Timer(remaining, () {
+      if (!mounted || _disposed) {
+        return;
+      }
+      setState(() => _showBusy = false);
+      _busyShownAt = null;
+    });
   }
 
   /// 请求一次当前档位的预览计算。
@@ -94,10 +138,13 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
       if (!mounted || _disposed) {
         return;
       }
-      if (_resultKey == _requestedKey) {
+      if (_resultKey == _requestedKey || _showBusy) {
         return;
       }
-      setState(() => _showBusy = true);
+      setState(() {
+        _showBusy = true;
+        _busyShownAt = DateTime.now();
+      });
     });
   }
 
@@ -214,6 +261,8 @@ class _ImageSendScreenState extends State<ImageSendScreen> {
             _stage = selected.first;
             _showBusy = false;
           });
+          _busyHideTimer?.cancel();
+          _busyShownAt = null;
           _requestPreview();
         },
       ),

@@ -363,6 +363,13 @@ void main() {
       expect(state.algorithm, DitherAlgorithm.bayer);
       expect(bayer, isNot(equals(floyd)));
     });
+
+    test('接收后台抖动结果后 previewImage 直接复用它（不在 UI 线程重算）', () {
+      final AppState state = buildState();
+      final RgbaImage fromIsolate = state.sourceImage.clone();
+      state.adoptDitheredResult(fromIsolate);
+      expect(identical(state.previewImage, fromIsolate), isTrue);
+    });
   });
 
   group('画布编辑', () {

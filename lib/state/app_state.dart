@@ -442,15 +442,45 @@ class AppState extends ChangeNotifier {
     return image;
   }
 
+  /// 把后台 isolate 算好的「处理 + 抖动」结果接进来。
+  ///
+  /// 界面上的预览由 `PreviewComputer` 在后台算；如果这里不接收它的结果，
+  /// 一改处理参数（尤其是色彩简化）就会有人回头调用 [previewImage]，
+  /// 在 UI 线程上重算「中值切分 + 抖动」—— 400×300 上要几百毫秒到几秒，
+  /// 于是「处理中」遮罩迟迟弹不出来，看起来像卡死。
+  ///
+  /// 接入后 [previewImage] 命中缓存，[transferPlan] 也只剩位打包 + RLE 这点活。
+  void adoptDitheredResult(RgbaImage image) {
+    if (image.width != _sourceImage.width || image.height != _sourceImage.height) {
+      return;
+    }
+    _previewCache = image;
+    _previewCacheKey = _previewImageKey();
+  }
+
+  Object _previewImageKey() => Object.hash(_sourceImage, _algorithm, _strength,
+      _contrast, colorMode, process.key, _sourceImage.width, _sourceImage.height,
+      _serpentine, identityHashCode(_noiseMask));
+
+  /// 给 [transferPlan] 用的预览图：拿不到最新结果时先用上一次的，绝不阻塞 UI。
+  ///
+  /// 参数刚改、后台还没算完的那一小段时间里，统计行会显示上一版的数据，
+  /// 等 isolate 回来自动刷新（用户看到的只是数字晚一两百毫秒更新）。
+  RgbaImage _previewForPlan() {
+    final RgbaImage? cached = _previewCache;
+    if (cached != null) {
+      return cached;
+    }
+    return previewImage;
+  }
+
   /// 抖动后的预览图（= 处理 + 对比度 + 抖动）。按参数做缓存，参数没变就不重算。
   ///
   /// **注意**：这是**同步**版本，会占用当前线程算完（400×300 约几十毫秒）。
   /// 界面上的实时预览请用 `previewComputer`（后台 isolate）算出来的结果，
   /// 只有「发送」这种本来就该等的地方才调这里。
   RgbaImage get previewImage {
-    final Object key = Object.hash(_sourceImage, _algorithm, _strength,
-        _contrast, colorMode, process.key, _sourceImage.width, _sourceImage.height,
-        _serpentine, identityHashCode(_noiseMask));
+    final Object key = _previewImageKey();
     final RgbaImage? cached = _previewCache;
     if (cached != null && _previewCacheKey == key) {
       return cached;
@@ -496,7 +526,7 @@ class AppState extends ChangeNotifier {
   /// build 会读好几次（统计行、警告列表、发送按钮），所以必须缓存 —— 否则单单
   /// 一次重绘就把主线程堵死，这正是之前"进页面就卡、拖滑块更卡"的根因。
   ImageTransferPlan get transferPlan {
-    final RgbaImage image = previewImage;
+    final RgbaImage image = _previewForPlan();
     final Object key = Object.hash(image, _driver.id, canvasSize.name, colorMode,
         _mtu, _rleSupported, _interleavedCount, _speed, _swapPlanes,
         _invertRedPlane);
@@ -1164,7 +1194,25 @@ class AppState extends ChangeNotifier {
     if (!_requireConnected('发送图片')) {
       return;
     }
-    await _sendPlan(transferPlan);
+    // 发送必须用最新参数算出来的图：这里宁可同步算一次（点「发送」本来就该等），
+    // 也不能把上一版参数的结果发出去。
+    final RgbaImage image = previewImage;
+    final ImageTransferPlan plan = planImageTransfer(
+      image: image,
+      driver: _driver,
+      colorMode: colorMode,
+      canvasSizeName: canvasSize.name,
+      mtu: planMtu,
+      rleSupported: _rleSupported,
+      interleavedCount: _interleavedCount,
+      alwaysWithResponse: true,
+      swapPlanes: _swapPlanes,
+      invertRedPlane: _invertRedPlane,
+    );
+    _planCache = plan;
+    _planCacheKey = Object.hash(image, _driver.id, canvasSize.name, colorMode, _mtu,
+        _rleSupported, _interleavedCount, _speed, _swapPlanes, _invertRedPlane);
+    await _sendPlan(plan);
   }
 
   /// 发一张纯色图（诊断用）。
