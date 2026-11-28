@@ -28,13 +28,46 @@ class AppInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     return SectionCard(
-      title: AppVersion.appName,
+      title: '软件信息',
       icon: Icons.auto_stories_outlined,
       dense: dense,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          InfoRow(label: '版本', value: AppVersion.fullVersion),
+          Row(
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/logo.png',
+                  width: 56,
+                  height: 56,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      AppVersion.appName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      AppVersion.fullVersion,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           InfoRow(
             label: '作者',
             value: AppVersion.authors,

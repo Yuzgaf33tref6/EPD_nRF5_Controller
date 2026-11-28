@@ -47,3 +47,5 @@ flutter:
   assets:
     # 蓝噪声抖动用的 64×64 阈值纹理（来源与许可见 assets/NOTICE.md）。
     - assets/blue_noise_64.png
+    # 应用 logo：关于页展示用（启动页与桌面图标在 android/app/src/main/res 里）。
+    - assets/logo.png
